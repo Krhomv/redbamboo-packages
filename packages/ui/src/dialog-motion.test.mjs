@@ -19,3 +19,10 @@ test("dialog motion keeps one backdrop treatment and distinct timing profiles", 
   assert.match(tokens, /\.rb-dialog-content\[data-motion="snappy"\][data-open\][\s\S]*?120ms/)
   assert.match(tokens, /prefers-reduced-motion: reduce[\s\S]*?animation-duration: 1ms/)
 })
+
+test("dialog search fields keep keyboard focus visible without a thick halo", () => {
+  assert.match(dialogSource, /function DialogSearchField/)
+  assert.match(dialogSource, /data-slot="dialog-search-field"/)
+  assert.match(dialogSource, /focus-within:border-ring/)
+  assert.doesNotMatch(dialogSource, /focus-within:ring-/)
+})

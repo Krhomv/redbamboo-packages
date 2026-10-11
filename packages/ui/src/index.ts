@@ -174,6 +174,7 @@ export {
   DialogHeader,
   DialogOverlay,
   DialogPortal,
+  DialogSearchField,
   DialogTitle,
   DialogTrigger,
 } from "./components/dialog"

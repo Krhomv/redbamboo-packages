@@ -14,6 +14,7 @@ import {
   DialogDescription,
   DialogFooter,
   DialogHeader,
+  DialogSearchField,
   DialogTitle,
 } from "@redbamboo/ui"
 import { useCommandList } from "./command-provider"
@@ -218,8 +219,7 @@ export function CommandPalette({
 
         {/* Search input */}
         <div data-slot="command-palette-search">
-          <div className="flex items-center gap-2.5 rounded-lg border border-input px-3 h-10 transition-colors focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring-a50 dark:bg-input-a30">
-            <SearchIcon className="h-4 w-4 shrink-0 opacity-50" />
+          <DialogSearchField>
             <input
               ref={inputRef}
               role="combobox"
@@ -235,7 +235,7 @@ export function CommandPalette({
               placeholder={placeholder}
               className="flex-1 min-w-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             />
-          </div>
+          </DialogSearchField>
         </div>
 
         {/* Command list */}
@@ -344,22 +344,4 @@ export function CommandPalette({
 
 export function openCommandPalette() {
   document.dispatchEvent(new Event("command-palette:open"))
-}
-
-function SearchIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx={11} cy={11} r={8} />
-      <path d="m21 21-4.3-4.3" />
-    </svg>
-  )
 }

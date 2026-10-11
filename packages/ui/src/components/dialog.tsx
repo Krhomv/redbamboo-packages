@@ -152,6 +152,22 @@ function DialogDescription({
   )
 }
 
+function DialogSearchField({ className, children, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="dialog-search-field"
+      className={cn(
+        "flex h-10 items-center gap-2.5 rounded-lg border border-input px-3 transition-colors focus-within:border-ring dark:bg-input-a30",
+        className,
+      )}
+      {...props}
+    >
+      <i className="ph ph-magnifying-glass shrink-0 text-base opacity-50" aria-hidden />
+      {children}
+    </div>
+  )
+}
+
 export {
   Dialog,
   DialogClose,
@@ -161,6 +177,7 @@ export {
   DialogHeader,
   DialogOverlay,
   DialogPortal,
+  DialogSearchField,
   DialogTitle,
   DialogTrigger,
 }
