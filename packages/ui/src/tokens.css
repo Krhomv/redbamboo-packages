@@ -638,6 +638,123 @@ body {
   animation-delay: var(--msg-enter-delay, 0ms);
 }
 
+/* Dialogs share one backdrop and choose motion by interaction weight.
+   Composed surfaces get room to arrive; transient inspectors stay quick. */
+@keyframes rb-dialog-overlay-in {
+  from {
+    opacity: 0;
+    -webkit-backdrop-filter: blur(0);
+    backdrop-filter: blur(0);
+  }
+  to {
+    opacity: 1;
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+  }
+}
+
+@keyframes rb-dialog-overlay-out {
+  from {
+    opacity: 1;
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+  }
+  to {
+    opacity: 0;
+    -webkit-backdrop-filter: blur(0);
+    backdrop-filter: blur(0);
+  }
+}
+
+@keyframes rb-dialog-content-in {
+  from {
+    opacity: 0;
+    filter: blur(var(--rb-dialog-start-blur));
+    translate: -50% calc(-50% + var(--rb-dialog-start-y));
+    scale: var(--rb-dialog-start-scale);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    translate: -50% -50%;
+    scale: 1;
+  }
+}
+
+@keyframes rb-dialog-content-out {
+  from {
+    opacity: 1;
+    filter: blur(0);
+    translate: -50% -50%;
+    scale: 1;
+  }
+  to {
+    opacity: 0;
+    filter: blur(var(--rb-dialog-start-blur));
+    translate: -50% calc(-50% + var(--rb-dialog-start-y));
+    scale: var(--rb-dialog-start-scale);
+  }
+}
+
+.rb-dialog-overlay {
+  background-color: rgb(0 0 0 / 10%);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
+.rb-dialog-overlay[data-motion="composed"][data-open] {
+  animation: rb-dialog-overlay-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.rb-dialog-overlay[data-motion="composed"][data-closed] {
+  animation: rb-dialog-overlay-out 160ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+.rb-dialog-overlay[data-motion="snappy"][data-open] {
+  animation: rb-dialog-overlay-in 110ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+.rb-dialog-overlay[data-motion="snappy"][data-closed] {
+  animation: rb-dialog-overlay-out 90ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+.rb-dialog-content[data-motion="composed"] {
+  --rb-dialog-start-blur: 2px;
+  --rb-dialog-start-y: 10px;
+  --rb-dialog-start-scale: 0.985;
+}
+
+.rb-dialog-content[data-motion="snappy"] {
+  --rb-dialog-start-blur: 0.5px;
+  --rb-dialog-start-y: 4px;
+  --rb-dialog-start-scale: 0.99;
+}
+
+.rb-dialog-content[data-motion="composed"][data-open] {
+  animation: rb-dialog-content-in 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.rb-dialog-content[data-motion="composed"][data-closed] {
+  animation: rb-dialog-content-out 160ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+.rb-dialog-content[data-motion="snappy"][data-open] {
+  animation: rb-dialog-content-in 120ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+.rb-dialog-content[data-motion="snappy"][data-closed] {
+  animation: rb-dialog-content-out 90ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rb-dialog-overlay[data-open],
+  .rb-dialog-overlay[data-closed],
+  .rb-dialog-content[data-open],
+  .rb-dialog-content[data-closed] {
+    animation-duration: 1ms;
+  }
+}
+
 @keyframes square-spawn {
   0%   { opacity: 0; scale: 0; translate: 0 8px; }
   35%  { opacity: 1; scale: 1.5; translate: 0 -4px; }

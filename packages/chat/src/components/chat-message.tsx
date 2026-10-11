@@ -568,11 +568,14 @@ function PartFrieze({ parts, allParts, isLive, resolveFileLink, resolveImageSrc,
   getTranscriptPayloadDownloadUrl?: (ref: TranscriptPayloadRef) => string
 }) {
   const [selected, setSelected] = useState<{ part: MessagePart; result?: MessagePart; index: number } | null>(null)
+  const retainedSelection = useRef<typeof selected>(null)
+  if (selected) retainedSelection.current = selected
+  const modalSelection = selected ?? retainedSelection.current
 
   // An opened thinking detail must follow immutable live item updates.
-  const currentThinking = selected?.part.type === "thinking" ? allParts[selected.index] : undefined
-  const selectedPart = currentThinking?.type === "thinking" && currentThinking.messageId === selected?.part.messageId
-    ? currentThinking : selected?.part
+  const currentThinking = modalSelection?.part.type === "thinking" ? allParts[modalSelection.index] : undefined
+  const selectedPart = currentThinking?.type === "thinking" && currentThinking.messageId === modalSelection?.part.messageId
+    ? currentThinking : modalSelection?.part
 
   const handleClick = (part: MessagePart) => {
     if (part.type === "tool_use") {
@@ -610,7 +613,7 @@ function PartFrieze({ parts, allParts, isLive, resolveFileLink, resolveImageSrc,
         })}
       </div>
 
-      <PartModal part={selectedPart} pairedResult={selected?.result} open={!!selected} onClose={() => setSelected(null)} resolveFileLink={resolveFileLink} resolveImageSrc={resolveImageSrc} resolveEventLink={resolveEventLink} resolveEventQueueStatus={resolveEventQueueStatus} loadTranscriptPayload={loadTranscriptPayload} getTranscriptPayloadDownloadUrl={getTranscriptPayloadDownloadUrl} />
+      <PartModal part={selectedPart} pairedResult={modalSelection?.result} open={!!selected} onClose={() => setSelected(null)} resolveFileLink={resolveFileLink} resolveImageSrc={resolveImageSrc} resolveEventLink={resolveEventLink} resolveEventQueueStatus={resolveEventQueueStatus} loadTranscriptPayload={loadTranscriptPayload} getTranscriptPayloadDownloadUrl={getTranscriptPayloadDownloadUrl} />
     </>
   )
 }
@@ -666,7 +669,7 @@ function PartModal({ part, pairedResult, open, onClose, resolveFileLink, resolve
   if (event) {
     return (
       <Dialog open={open} onOpenChange={v => { if (!v) onClose() }}>
-        <DialogContent className="max-w-md sm:max-w-lg max-h-[70vh] flex flex-col p-0 gap-0">
+        <DialogContent motion="snappy" className="max-w-md sm:max-w-lg max-h-[70vh] flex flex-col p-0 gap-0">
           <DialogHeader className="flex-row items-center gap-2.5 px-4 py-3 border-b border-border-subtle shrink-0">
             <div
               className="w-3 h-3 rounded-full"
@@ -698,6 +701,7 @@ function PartModal({ part, pairedResult, open, onClose, resolveFileLink, resolve
   return (
     <Dialog open={open} onOpenChange={v => { if (!v) onClose() }}>
       <DialogContent
+        motion="snappy"
         className="flex flex-col p-0 gap-0"
         style={{ maxWidth: "min(42rem, calc(100vw - 2rem))", maxHeight: "82vh" }}
       >
@@ -1307,7 +1311,7 @@ function MessageMetadata({ block, inline }: { block: MessageBlock; inline?: bool
       </button>
 
       <Dialog open={open} onOpenChange={v => { if (!v) setOpen(false) }}>
-        <DialogContent className="max-w-sm max-h-[70vh] flex flex-col p-0 gap-0">
+        <DialogContent motion="snappy" className="max-w-sm max-h-[70vh] flex flex-col p-0 gap-0">
           <DialogHeader className="flex-row items-center gap-2.5 px-4 py-3 border-b border-border-subtle shrink-0">
             <i className="ph-bold ph-info text-sm text-text-muted" />
             <DialogTitle className="text-sm">Message Info</DialogTitle>
@@ -1404,7 +1408,7 @@ function TaskNotificationSquare({ notification }: { notification: TaskNotificati
       />
 
       <Dialog open={open} onOpenChange={v => { if (!v) setOpen(false) }}>
-        <DialogContent className="max-w-md sm:max-w-lg max-h-[70vh] flex flex-col p-0 gap-0">
+        <DialogContent motion="snappy" className="max-w-md sm:max-w-lg max-h-[70vh] flex flex-col p-0 gap-0">
           <DialogHeader className="flex-row items-center gap-2.5 px-4 py-3 border-b border-border-subtle shrink-0">
             <div className="w-3 h-3 rounded-[2px]" style={{ backgroundColor: COLOR.fallback }} />
             <DialogTitle className="text-sm">Background Task</DialogTitle>

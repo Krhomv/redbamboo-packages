@@ -178,6 +178,8 @@ export {
   DialogTrigger,
 } from "./components/dialog"
 
+export type { DialogMotion } from "./components/dialog"
+
 export {
   ToastProvider,
   useToast,

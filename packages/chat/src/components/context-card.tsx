@@ -68,7 +68,7 @@ export function ContextSquare({ context, rawXml }: ContextSquareProps) {
       />
 
       <Dialog open={open} onOpenChange={v => { if (!v) setOpen(false) }}>
-        <DialogContent className="max-w-md sm:max-w-lg max-h-[70vh] flex flex-col p-0 gap-0">
+        <DialogContent motion="snappy" className="max-w-md sm:max-w-lg max-h-[70vh] flex flex-col p-0 gap-0">
           <DialogHeader className="flex-row items-center gap-2.5 px-4 py-3 border-b border-border-subtle shrink-0">
             <div className="w-3 h-3 rounded-[2px]" style={{ backgroundColor: NOVA_MAGENTA }} />
             <i className={`${app.icon} text-sm`} style={{ color: app.color }} />

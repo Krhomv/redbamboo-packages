@@ -160,7 +160,7 @@ function AppSwitcher({ open, onOpenChange, apps }: AppSwitcherProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent showCloseButton={false} className="w-72 sm:max-w-none p-2">
+      <DialogContent motion="snappy" showCloseButton={false} className="w-72 sm:max-w-none p-2">
         <div className="app-switcher-list">
           {rows.map((row, i) => (
             <a
