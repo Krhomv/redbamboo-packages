@@ -113,6 +113,8 @@ export { processStreamEvent, parseStructuredQuestions } from "./lib/process-stre
 export { EVENT_TOOL_PREFIX, isEventPart, isEventBlock, streamTargetIndex } from "./lib/event-parts"
 export { getEffectiveToolName } from "./lib/tool-semantics"
 export { rebuildBlocks } from "./lib/rebuild-blocks"
+export { projectActivityTimeline } from "./lib/activity-timeline"
+export type { ActivityTimelineRow } from "./lib/activity-timeline"
 export { canonicalUserMessageUids } from "./lib/message-queue"
 export { DeferredInvalidationCoordinator } from "./lib/deferred-invalidation-coordinator"
 export type { PersistedMessage } from "./lib/rebuild-blocks"
