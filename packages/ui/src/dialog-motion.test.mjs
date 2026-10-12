@@ -26,3 +26,9 @@ test("dialog search fields keep keyboard focus visible without a thick halo", ()
   assert.match(dialogSource, /focus-within:border-ring/)
   assert.doesNotMatch(dialogSource, /focus-within:ring-/)
 })
+
+test("dialog width keeps a mobile gutter when consumers override max width", () => {
+  assert.match(dialogSource, /w-\[calc\(100%-2rem\)\]/)
+  assert.match(dialogSource, /sm:max-w-md/)
+  assert.doesNotMatch(dialogSource, /w-full max-w-\[calc\(100%-2rem\)\]/)
+})
