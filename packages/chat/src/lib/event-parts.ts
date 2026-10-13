@@ -22,7 +22,8 @@ export function isEventPart(part: MessagePart): boolean {
 
 /** Action-like events keep the square tool affordance instead of an ambient dot. */
 export function usesSquareEventMarker(part: MessagePart): boolean {
-  return isEventPart(part) && part.toolName === "event:delegation"
+  return isEventPart(part)
+    && (part.toolName === "event:delegation" || part.toolName === "event:voice-session")
 }
 
 /** True for a block carrying only frieze events, i.e. ambient, not a model turn. */
