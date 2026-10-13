@@ -1,6 +1,7 @@
 export interface WorkspaceField{key:string;name:string;fieldType:string;sortOrder:number;required:boolean;description?:string|null;constraints?:unknown;displayHints?:unknown}
 export interface WorkspaceType{slug:string;name:string;description?:string|null;icon?:string|null;color?:string|null;folder?:string|null;system?:boolean;fields:WorkspaceField[]}
-export interface WorkspaceEntity{id:string;typeSlug:string;slug:string;name:string;data:Record<string,unknown>;createdAt:string;updatedAt:string}
+export interface WorkspacePlayerView{prepared:boolean;title:string;description:string;imageField?:string|null;fieldKeys:string[];updatedAt?:string|null}
+export interface WorkspaceEntity{id:string;typeSlug:string;slug:string;name:string;data:Record<string,unknown>;createdAt:string;updatedAt:string;playerView?:WorkspacePlayerView}
 export type WorkspacePresentationVariant='compact'|'card'|'timeline'|'detail'|'table'
 export interface WorkspacePresentationField{key:string;name:string;value:unknown;fieldType:string}
 export interface WorkspaceEntityPresentation{id:string;typeSlug:string;typeName:string;title:string;eyebrow:string;summary?:string;icon?:string|null;color?:string|null;fields:WorkspacePresentationField[];variant:WorkspacePresentationVariant}
@@ -11,6 +12,7 @@ export interface WorkspaceSaveInput{name:string;data:Record<string,unknown>;expe
 export interface WorkspaceCreateInput{typeSlug:string;name:string;parent?:string;data?:Record<string,unknown>}
 export interface WorkspaceTransport{list(input:WorkspaceListInput):Promise<WorkspaceEntityPage>;save(entityId:string,input:WorkspaceSaveInput):Promise<WorkspaceEntity>;create(input:WorkspaceCreateInput):Promise<WorkspaceEntity>;remove(entityId:string,expectedUpdatedAt:string):Promise<void>}
 export interface WorkspaceFieldRendererProps{entity:WorkspaceEntity;field:WorkspaceField;value:unknown;set(value:unknown):void;disabled:boolean}
+export interface WorkspaceEntitySupplementProps{entity:WorkspaceEntity;type?:WorkspaceType;readOnly:boolean;saved(entity:WorkspaceEntity):Promise<void>}
 export interface WorkspaceMessages{
  pages:string;system:string;searchResults:string;recordsCouldNotLoad:string;loading:string;noSearchResults:string;noRecords:string;loadMore:(loaded:number,total:number)=>string;
  workspaceContents:string;searchPlaceholder:string;searchLabel:string;newRecord:string;backToWorkspace:string;saved:string;recordCouldNotSave:string;deleteConfirm:(name:string)=>string;
