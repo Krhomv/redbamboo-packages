@@ -201,6 +201,17 @@ export type { AudioPlayerProps } from "./components/audio-player"
 export { ImageLightbox } from "./components/image-lightbox"
 export type { ImageLightboxProps } from "./components/image-lightbox"
 
+export { Sheet, sheetVariants } from "./components/sheet"
+export type { SheetProps, SheetSide } from "./components/sheet"
+
+export { MediaViewer } from "./components/media-viewer"
+export type {
+  MediaViewerContext,
+  MediaViewerItem,
+  MediaViewerProps,
+  MediaViewerSlot,
+} from "./components/media-viewer"
+
 export { ItemList, ItemListRow } from "./components/item-list"
 export type { ItemListProps, ItemListRowProps } from "./components/item-list"
 

@@ -31,3 +31,16 @@ test("floating surfaces are discoverable with stable activation selectors", () =
   assert.ok(surface?.selectors.includes('[data-slot="floating-surface-trigger"]'))
   assert.ok(surface?.exports.includes("runUiSurfaceAction"))
 })
+
+test("sheet and media viewer are discoverable with their composition selectors", () => {
+  const sheet = findUiComponents("bottom-sheet")[0]
+  assert.equal(sheet?.id, "sheet")
+  assert.ok(sheet?.selectors.includes('[data-slot="sheet"]'))
+  assert.ok(sheet?.variants.includes("side:bottom"))
+
+  const viewer = findUiComponents("zoom")[0]
+  assert.equal(viewer?.id, "media-viewer")
+  assert.ok(viewer?.exports.includes("MediaViewer"))
+  assert.ok(viewer?.selectors.includes('[data-slot="media-viewer-desktop-panel"]'))
+  assert.ok(viewer?.selectors.includes('[data-slot="media-viewer-action-row"]'))
+})

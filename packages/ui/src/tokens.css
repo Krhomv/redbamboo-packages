@@ -755,6 +755,87 @@ body {
   }
 }
 
+/* ── Sheet and media-viewer motion ────────────────────────────────── */
+
+@keyframes rb-sheet-in {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes rb-sheet-out {
+  from { transform: translateY(0); }
+  to { transform: translateY(100%); }
+}
+
+.rb-sheet-overlay[data-open],
+.rb-media-viewer-overlay[data-open] {
+  animation: rb-dialog-overlay-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.rb-sheet-overlay[data-closed],
+.rb-media-viewer-overlay[data-closed] {
+  animation: rb-dialog-overlay-out 160ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+.rb-sheet[data-side="bottom"][data-motion="composed"][data-open] {
+  animation: rb-sheet-in 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.rb-sheet[data-side="bottom"][data-motion="composed"][data-closed] {
+  animation: rb-sheet-out 160ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+.rb-sheet[data-side="bottom"][data-motion="snappy"][data-open] {
+  animation: rb-sheet-in 120ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+.rb-sheet[data-side="bottom"][data-motion="snappy"][data-closed] {
+  animation: rb-sheet-out 90ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+.rb-media-viewer[data-open] {
+  animation: rb-dialog-overlay-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.rb-media-viewer[data-closed] {
+  animation: rb-dialog-overlay-out 160ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+.rb-media-viewer-fit,
+.rb-media-viewer-controls,
+[data-slot="media-viewer-action-row"] {
+  transition:
+    transform 220ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+}
+
+.rb-media-viewer-fit[data-sheet-state="closed"],
+.rb-media-viewer-controls[data-sheet-state="closed"],
+[data-slot="media-viewer-action-row"][data-sheet-state="closed"] {
+  transition-duration: 160ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 1, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rb-sheet-overlay[data-open],
+  .rb-sheet-overlay[data-closed],
+  .rb-sheet[data-open],
+  .rb-sheet[data-closed],
+  .rb-media-viewer-overlay[data-open],
+  .rb-media-viewer-overlay[data-closed],
+  .rb-media-viewer[data-open],
+  .rb-media-viewer[data-closed] {
+    animation-duration: 1ms;
+  }
+
+  .rb-media-viewer-fit,
+  .rb-media-viewer-controls,
+  [data-slot="media-viewer-action-row"] {
+    transition-duration: 1ms;
+  }
+}
+
 @keyframes square-spawn {
   0%   { opacity: 0; scale: 0; translate: 0 8px; }
   35%  { opacity: 1; scale: 1.5; translate: 0 -4px; }

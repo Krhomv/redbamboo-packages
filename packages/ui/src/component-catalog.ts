@@ -12,6 +12,55 @@ export interface UiComponentDescriptor {
 
 export const UI_COMPONENT_CATALOG: readonly UiComponentDescriptor[] = [
   {
+    id: "media-viewer",
+    packageName: "@redbamboo/ui",
+    exports: ["MediaViewer", "MediaViewerItem", "MediaViewerContext"],
+    description: "Full-screen, multi-item image and video viewer with responsive detail and action slots.",
+    tags: ["media", "image", "video", "lightbox", "viewer", "gallery", "zoom", "swipe"],
+    useWhen: [
+      "Inspecting or navigating an array of images and videos in a fixed dark stage.",
+      "A media experience needs desktop metadata, mobile details, or mobile action composition.",
+      "Images need placeholder-to-original loading, zoom, pan, swipe, or sheet-aware fitting.",
+    ],
+    avoidWhen: [
+      "Showing one image with no metadata or navigation; use ImageLightbox.",
+      "Embedding media inline in document flow.",
+    ],
+    variants: ["image", "video", "desktop-panel", "mobile-sheet", "mobile-actions"],
+    selectors: [
+      '[data-slot="media-viewer"]',
+      '[data-slot="media-viewer-stage"]',
+      '[data-slot="media-viewer-image"]',
+      '[data-slot="media-viewer-video"]',
+      '[data-slot="media-viewer-placeholder"]',
+      '[data-slot="media-viewer-position"]',
+      '[data-slot="media-viewer-desktop-panel"]',
+      '[data-slot="media-viewer-action-row"]',
+    ],
+  },
+  {
+    id: "sheet",
+    packageName: "@redbamboo/ui",
+    exports: ["Sheet", "sheetVariants"],
+    description: "Modal edge sheet with focus containment, safe-area padding, and composed motion.",
+    tags: ["sheet", "bottom-sheet", "dialog", "mobile", "overlay", "focus-trap"],
+    useWhen: [
+      "Presenting contextual controls or details from a viewport edge.",
+      "A mobile workflow needs a modal bottom sheet with measured height.",
+    ],
+    avoidWhen: [
+      "The content should be a centered modal; use Dialog.",
+      "The content is a lightweight anchored disclosure; use Popover.",
+    ],
+    variants: ["side:bottom", "motion:composed", "motion:snappy"],
+    selectors: [
+      '[data-slot="sheet"]',
+      '[data-slot="sheet-overlay"]',
+      '[data-slot="sheet-header"]',
+      '[data-slot="sheet-content"]',
+    ],
+  },
+  {
     id: "entity-card",
     packageName: "@redbamboo/ui",
     exports: [

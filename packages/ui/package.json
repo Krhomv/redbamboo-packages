@@ -27,15 +27,16 @@
     "typecheck": "tsc --noEmit",
     "lint": "echo ok",
     "test": "node --experimental-strip-types --test \"src/**/*.test.mjs\"",
+    "test:browser": "node tests/media-overlays/run.mjs",
     "clean": "rimraf dist"
   },
   "peerDependencies": {
+    "@base-ui/react": "^1.4.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "tailwindcss": "^4.0.0",
-    "@base-ui/react": "^1.4.0",
     "react-resizable-panels": "^4.9.0",
-    "recharts": "^2.15.0"
+    "recharts": "^2.15.0",
+    "tailwindcss": "^4.0.0"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",
@@ -43,7 +44,9 @@
     "tailwind-merge": "^3.5.0"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-react": "^6.0.1",
+    "playwright": "^1.60.0",
     "typescript": "~5.9.3",
     "vite": "^8.0.1",
     "vite-plugin-dts": "^4.5.4"
