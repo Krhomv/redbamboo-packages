@@ -420,19 +420,17 @@ export function MediaViewer<T extends MediaViewerItem>({
                   <img
                     key={String(item.id ?? item.src)}
                     data-slot="media-viewer-image"
+                    data-gesture-active={gesture.current.pointers.size > 0}
                     src={item.src}
                     alt={item.alt ?? ""}
                     width={item.width}
                     height={item.height}
                     draggable={false}
                     className={cn(
-                      "col-start-1 row-start-1 max-h-[90svh] max-w-full select-none object-contain transition-opacity duration-150",
+                      "rb-media-viewer-media col-start-1 row-start-1 max-h-[90svh] max-w-full select-none object-contain",
                       item.placeholderSrc && !originalLoaded ? "opacity-0" : "opacity-100",
                     )}
-                    style={{
-                      transform: `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.scale})`,
-                      transition: gesture.current.pointers.size ? "none" : "transform 150ms ease-out, opacity 150ms ease-out",
-                    }}
+                    style={{ transform: `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.scale})` }}
                     onLoad={(event) => {
                       setIntrinsicSize({
                         width: event.currentTarget.naturalWidth,

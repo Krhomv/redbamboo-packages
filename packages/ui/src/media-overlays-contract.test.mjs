@@ -48,4 +48,6 @@ test("sheet choreography uses composed timing and honors reduced motion", () => 
   assert.match(tokens, /\.rb-media-viewer-fit[\s\S]*?220ms cubic-bezier\(0\.16, 1, 0\.3, 1\)/)
   assert.match(tokens, /prefers-reduced-motion: reduce[\s\S]*?\.rb-sheet\[data-side="bottom"\]\[data-motion\]\[data-open\][\s\S]*?animation-duration: 0s/)
   assert.match(tokens, /prefers-reduced-motion: reduce[\s\S]*?\.rb-media-viewer-fit\[data-sheet-state\][\s\S]*?transition-duration: 0s/)
+  assert.match(tokens, /prefers-reduced-motion: reduce[\s\S]*?\.rb-media-viewer-media\[data-gesture-active\][\s\S]*?transition-duration: 0s/)
+  assert.doesNotMatch(viewer, /transition: gesture\.current/, "zoom transition must live in tokens.css so reduced motion can disable it")
 })

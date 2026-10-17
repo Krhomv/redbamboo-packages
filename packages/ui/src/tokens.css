@@ -817,6 +817,16 @@ body {
   transition-timing-function: cubic-bezier(0.4, 0, 1, 1);
 }
 
+.rb-media-viewer-media {
+  transition:
+    transform 150ms ease-out,
+    opacity 150ms ease-out;
+}
+
+.rb-media-viewer-media[data-gesture-active="true"] {
+  transition: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .rb-sheet-overlay[data-motion][data-open],
   .rb-sheet-overlay[data-motion][data-closed],
@@ -832,7 +842,8 @@ body {
 
   .rb-media-viewer-fit[data-sheet-state],
   .rb-media-viewer-controls[data-sheet-state],
-  [data-slot="media-viewer-action-row"][data-sheet-state] {
+  [data-slot="media-viewer-action-row"][data-sheet-state],
+  .rb-media-viewer-media[data-gesture-active] {
     transition-duration: 0s;
   }
 }

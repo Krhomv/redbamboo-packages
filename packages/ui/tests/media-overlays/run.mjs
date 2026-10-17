@@ -212,6 +212,7 @@ try {
         sheetTop: sheet.getBoundingClientRect().top,
         animationDuration: getComputedStyle(sheet).animationDuration,
         transitionDuration: getComputedStyle(sheet).transitionDuration,
+        imageTransitionDuration: getComputedStyle(image).transitionDuration,
       }
     })
     assert.equal(geometry.inPortal, true, `${media} viewer and sheet should render in the UiEnvironment portal`)
@@ -220,6 +221,7 @@ try {
     assert.ok(geometry.imageBottom <= geometry.sheetTop + 0.5, `${media} media should end above the details sheet`)
     assert.equal(geometry.animationDuration, "0s", `${media} sheet animation should be disabled for reduced motion`)
     assert.equal(geometry.transitionDuration, "0s", `${media} sheet transition should be disabled for reduced motion`)
+    assert.match(geometry.imageTransitionDuration, /^0s(, 0s)*$/, `${media} zoom transition should be disabled for reduced motion`)
 
     if (media === "portrait") {
       await fitStage.dispatchEvent("pointerdown", { pointerId: 50, pointerType: "touch", clientX: 320, clientY: 140, isPrimary: true })
