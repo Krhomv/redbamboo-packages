@@ -12,7 +12,7 @@ import {
   useUiEnvironment,
 } from "@redbamboo/ui"
 import type { MessageBlock, MessagePart, ImageAttachment, QuestionAnswerPayload, QuestionOutcome, StructuredQuestion, TranscriptPayloadLoader, TranscriptPayloadRef } from "../types"
-import { StreamingText, MarkdownRenderer } from "./streaming-text"
+import { ImageThumbnail, StreamingText, MarkdownRenderer } from "./streaming-text"
 import { resolveChatMediaSrc } from "../lib/media-url"
 import { ContextSquare, parseContextFromMessage, extractRawContextXml } from "./context-card"
 import { stripHiddenMessageEnvelopes } from "../lib/message-content"
@@ -460,16 +460,16 @@ export const ChatMessage = memo(function ChatMessage({
             </div>
           ) : group.kind === "image" ? (
             <div key={i} className="msg-enter-ai my-2">
-              <img
+              <ImageThumbnail
                 src={group.parts[0].url
-                  ? resolveChatMediaSrc(group.parts[0].url, resolveImageSrc)
+                  ? group.parts[0].url
                   : group.parts[0].base64
                     ? `data:${group.parts[0].mediaType ?? "image/png"};base64,${group.parts[0].base64}`
                     : group.parts[0].payloadRef && getTranscriptPayloadMediaUrl
                       ? getTranscriptPayloadMediaUrl(group.parts[0].payloadRef)
                       : ""}
                 alt={group.parts[0].content || "Generated image"}
-                className="max-h-64 rounded-md border border-overlay-10"
+                resolve={resolveImageSrc}
               />
             </div>
           ) : (

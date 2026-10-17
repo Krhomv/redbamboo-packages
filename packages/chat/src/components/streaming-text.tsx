@@ -72,12 +72,13 @@ export function MediaLightbox() {
   )
 }
 
-function ImageThumbnail({ src, alt, resolve }: { src?: string; alt?: string; resolve?: (s: string) => string | undefined }) {
+export function ImageThumbnail({ src, alt, resolve }: { src?: string; alt?: string; resolve?: (s: string) => string | undefined }) {
   const resolved = resolveChatMediaSrc(src, resolve)
 
   return (
     <button
       onClick={() => setLightbox({ src: resolved || "", alt: alt || "", type: "image" })}
+      data-slot="chat-image-embed"
       className="inline-block rounded-lg overflow-hidden border border-overlay-10 hover:border-overlay-30 transition-colors cursor-pointer my-1"
     >
       <img src={resolved} alt={alt || ""} loading="lazy" className="w-20 h-20 object-cover" />
