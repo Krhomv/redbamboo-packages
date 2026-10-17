@@ -565,7 +565,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
               <button
                 onClick={() => imageInputRef.current?.click()}
                 disabled={inputDisabled}
-                className="w-7 h-7 flex items-center justify-center rounded text-muted-a50 hover:text-text-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                className="w-7 h-7 flex items-center justify-center rounded text-muted-a50 hover:text-text-muted hover:bg-overlay-6 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 title="Attach image"
               >
                 <i className="ph-bold ph-image text-xs" />
@@ -575,7 +575,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={inputDisabled}
-                className="w-7 h-7 flex items-center justify-center rounded text-muted-a50 hover:text-text-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                className="w-7 h-7 flex items-center justify-center rounded text-muted-a50 hover:text-text-muted hover:bg-overlay-6 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 title="Attach file"
               >
                 <i className="ph-bold ph-paperclip text-xs" />
