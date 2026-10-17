@@ -14,7 +14,7 @@ export const UI_COMPONENT_CATALOG: readonly UiComponentDescriptor[] = [
   {
     id: "media-viewer",
     packageName: "@redbamboo/ui",
-    exports: ["MediaViewer", "MediaViewerItem", "MediaViewerContext"],
+    exports: ["MediaViewer", "MediaViewerItem", "MediaViewerContext", "MediaViewerZoom"],
     description: "Full-screen, multi-item image and video viewer with responsive detail and action slots.",
     tags: ["media", "image", "video", "lightbox", "viewer", "gallery", "zoom", "swipe"],
     useWhen: [
@@ -42,11 +42,12 @@ export const UI_COMPONENT_CATALOG: readonly UiComponentDescriptor[] = [
     id: "sheet",
     packageName: "@redbamboo/ui",
     exports: ["Sheet", "sheetVariants"],
-    description: "Modal edge sheet with focus containment, safe-area padding, and composed motion.",
+    description: "Edge sheet with optional modal containment, safe-area padding, and composed motion.",
     tags: ["sheet", "bottom-sheet", "dialog", "mobile", "overlay", "focus-trap"],
     useWhen: [
       "Presenting contextual controls or details from a viewport edge.",
       "A mobile workflow needs a modal bottom sheet with measured height.",
+      "A parent modal needs a non-modal nested sheet that leaves the parent surface interactive.",
     ],
     avoidWhen: [
       "The content should be a centered modal; use Dialog.",

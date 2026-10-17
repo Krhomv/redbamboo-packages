@@ -818,21 +818,22 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .rb-sheet-overlay[data-open],
-  .rb-sheet-overlay[data-closed],
-  .rb-sheet[data-open],
-  .rb-sheet[data-closed],
+  .rb-sheet-overlay[data-motion][data-open],
+  .rb-sheet-overlay[data-motion][data-closed],
+  .rb-sheet[data-side="bottom"][data-motion][data-open],
+  .rb-sheet[data-side="bottom"][data-motion][data-closed],
   .rb-media-viewer-overlay[data-open],
   .rb-media-viewer-overlay[data-closed],
   .rb-media-viewer[data-open],
   .rb-media-viewer[data-closed] {
-    animation-duration: 1ms;
+    animation-duration: 0s;
+    transition-duration: 0s;
   }
 
-  .rb-media-viewer-fit,
-  .rb-media-viewer-controls,
-  [data-slot="media-viewer-action-row"] {
-    transition-duration: 1ms;
+  .rb-media-viewer-fit[data-sheet-state],
+  .rb-media-viewer-controls[data-sheet-state],
+  [data-slot="media-viewer-action-row"][data-sheet-state] {
+    transition-duration: 0s;
   }
 }
 

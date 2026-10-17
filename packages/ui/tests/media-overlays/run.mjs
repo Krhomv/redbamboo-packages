@@ -81,6 +81,8 @@ try {
   const viewer = page.locator('[data-slot="media-viewer"]')
   await viewer.waitFor()
   assert.equal(await viewer.evaluate((node) => node.contains(document.activeElement)), true, "MediaViewer should receive focus")
+  assert.equal(await page.locator('[data-slot="media-viewer-position"]').count(), 1, "desktop should render one position counter")
+  assert.doesNotMatch(await page.locator('[data-slot="media-viewer-action-row"]').innerText(), /\d+\s*\/\s*\d+/, "desktop action pill should not duplicate the position counter")
   await page.keyboard.press("ArrowRight")
   await page.getByLabel("Item 2 of 3").waitFor()
   await page.keyboard.press("ArrowRight")
@@ -153,8 +155,28 @@ try {
     const fitPage = await fitContext.newPage()
     await fitPage.goto(`${baseUrl}?component=launcher&theme=light&media=${media}`, { waitUntil: "networkidle" })
     await fitPage.getByRole("button", { name: "Open viewer" }).click()
+    const fitStage = fitPage.locator('[data-slot="media-viewer-stage"]')
+    if (media === "portrait") {
+      for (let tap = 0; tap < 2; tap += 1) {
+        await fitStage.dispatchEvent("pointerdown", { pointerId: 40 + tap, pointerType: "touch", clientX: 250, clientY: 160, isPrimary: true })
+        await fitStage.dispatchEvent("pointerup", { pointerId: 40 + tap, pointerType: "touch", clientX: 250, clientY: 160, isPrimary: true })
+      }
+      await fitPage.waitForFunction(() => document.querySelector('[data-slot="media-viewer-stage"]')?.getAttribute("data-zoom-scale") === "2.5")
+      await fitStage.dispatchEvent("pointerdown", { pointerId: 49, pointerType: "touch", clientX: 200, clientY: 150, isPrimary: true })
+    }
     await fitPage.getByRole("button", { name: "Show details" }).click()
-    await fitPage.locator('[data-slot="sheet"]').waitFor()
+    const fitSheet = fitPage.locator('[data-slot="sheet"]')
+    await fitSheet.waitFor()
+    assert.equal(await fitPage.locator('[data-slot="sheet-overlay"]').count(), 0, "viewer-owned non-modal sheet should not cover the stage with a backdrop")
+    await fitPage.waitForFunction(() => document.querySelector('[data-slot="media-viewer-stage"]')?.getAttribute("data-zoom-scale") === "1")
+    await fitPage.keyboard.press("Tab")
+    assert.equal(await fitPage.evaluate(() => {
+      const active = document.activeElement
+      return Boolean(active && (
+        document.querySelector('[data-slot="media-viewer"]')?.contains(active)
+        || document.querySelector('[data-slot="sheet"]')?.contains(active)
+      ))
+    }), true, "focus should remain in the viewer layer while its non-modal sheet is open")
     await fitPage.waitForFunction(() => {
       const fit = document.querySelector('[data-slot="media-viewer-media-fit"]')
       return fit instanceof HTMLElement && Number(fit.dataset.fitScale) < 1
@@ -177,16 +199,36 @@ try {
       if (!(portal instanceof HTMLElement) || !(viewer instanceof HTMLElement) || !(fit instanceof HTMLElement)
         || !(image instanceof HTMLImageElement) || !(sheet instanceof HTMLElement)) throw new Error("fit geometry elements missing")
       const transform = new DOMMatrix(getComputedStyle(fit).transform)
+      const stage = document.querySelector('[data-slot="media-viewer-stage"]')
+      const stageHitTarget = document.elementFromPoint(
+        viewer.getBoundingClientRect().width / 2,
+        Math.max(20, sheet.getBoundingClientRect().top - 40),
+      )
       return {
         inPortal: portal.contains(viewer) && portal.contains(sheet),
+        stageInteractive: stage instanceof HTMLElement && stageHitTarget instanceof Node && stage.contains(stageHitTarget),
         scale: transform.a,
         imageBottom: image.getBoundingClientRect().bottom,
         sheetTop: sheet.getBoundingClientRect().top,
+        animationDuration: getComputedStyle(sheet).animationDuration,
+        transitionDuration: getComputedStyle(sheet).transitionDuration,
       }
     })
     assert.equal(geometry.inPortal, true, `${media} viewer and sheet should render in the UiEnvironment portal`)
+    assert.equal(geometry.stageInteractive, true, `${media} visible stage should remain the pointer hit target`)
     assert.ok(geometry.scale < 1, `${media} fit scale should shrink while the details sheet is open`)
     assert.ok(geometry.imageBottom <= geometry.sheetTop + 0.5, `${media} media should end above the details sheet`)
+    assert.equal(geometry.animationDuration, "0s", `${media} sheet animation should be disabled for reduced motion`)
+    assert.equal(geometry.transitionDuration, "0s", `${media} sheet transition should be disabled for reduced motion`)
+
+    if (media === "portrait") {
+      await fitStage.dispatchEvent("pointerdown", { pointerId: 50, pointerType: "touch", clientX: 320, clientY: 140, isPrimary: true })
+      await fitStage.dispatchEvent("pointerup", { pointerId: 50, pointerType: "touch", clientX: 100, clientY: 140, isPrimary: true })
+      await fitPage.getByLabel("Item 2 of 4").waitFor()
+      assert.equal(await fitSheet.isVisible(), true, "stage swipe should not dismiss the details sheet")
+    }
+    await fitPage.getByRole("button", { name: "Close viewer" }).click()
+    await fitPage.locator('[data-slot="media-viewer"]').waitFor({ state: "hidden" })
     await fitContext.close()
   }
 
@@ -195,6 +237,7 @@ try {
     { component: "sheet", theme, width: 1440, height: 960 },
     { component: "sheet", theme, width: 390, height: 844 },
     { component: "viewer", theme, width: 1440, height: 960 },
+    { component: "viewer", theme, media: "portrait", width: 1440, height: 960 },
     { component: "viewer", theme, width: 390, height: 844, openDetails: true },
     { component: "viewer", theme, media: "portrait", width: 390, height: 844, openDetails: true },
   ])

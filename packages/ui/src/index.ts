@@ -211,6 +211,7 @@ export type {
   MediaViewerProps,
   MediaViewerSlot,
 } from "./components/media-viewer"
+export type { MediaViewerZoom } from "./components/media-viewer-gestures"
 
 export { ItemList, ItemListRow } from "./components/item-list"
 export type { ItemListProps, ItemListRowProps } from "./components/item-list"

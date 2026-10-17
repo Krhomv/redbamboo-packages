@@ -29,6 +29,10 @@ export interface SheetProps {
   "aria-label": string
   children: React.ReactNode
   side?: SheetSide
+  /** Whether the sheet owns a modal backdrop and focus trap. @default true */
+  modal?: boolean
+  /** Whether an outside pointer press closes the sheet. @default true */
+  closeOnOutsidePress?: boolean
   motion?: DialogMotion
   className?: string
   overlayClassName?: string
@@ -41,8 +45,8 @@ export interface SheetProps {
 }
 
 /**
- * A modal edge sheet with focus containment, Escape/outside dismissal, safe-area
- * padding, and the design system's composed motion profile.
+ * An edge sheet with optional modal containment, Escape/outside dismissal,
+ * safe-area padding, and the design system's composed motion profile.
  */
 export function Sheet({
   open,
@@ -50,6 +54,8 @@ export function Sheet({
   "aria-label": ariaLabel,
   children,
   side = "bottom",
+  modal = true,
+  closeOnOutsidePress = true,
   motion = "composed",
   className,
   overlayClassName,
@@ -79,15 +85,16 @@ export function Sheet({
   return (
     <DialogPrimitive.Root
       open={open}
-      modal
+      modal={modal}
+      disablePointerDismissal={!closeOnOutsidePress}
       onOpenChange={(nextOpen) => onOpenChange(nextOpen)}
     >
       <DialogPrimitive.Portal container={environment.portalContainer}>
-        <DialogPrimitive.Backdrop
+        {modal ? <DialogPrimitive.Backdrop
           data-slot="sheet-overlay"
           data-motion={motion}
           className={cn("rb-sheet-overlay fixed inset-0 z-[69] bg-black/20", overlayClassName)}
-        />
+        /> : null}
         <DialogPrimitive.Popup
           ref={setPanel}
           data-slot="sheet"

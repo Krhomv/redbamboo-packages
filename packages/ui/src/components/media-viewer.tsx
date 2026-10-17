@@ -36,6 +36,10 @@ export interface MediaViewerContext<T extends MediaViewerItem = MediaViewerItem>
   itemCount: number
   detailsOpen: boolean
   setDetailsOpen: (open: boolean) => void
+  /** Current user zoom and pan state. */
+  zoom: MediaViewerZoom
+  /** Reset user zoom, pan, and any active pointer gesture. Call before opening consumer-owned sheets. */
+  resetZoom: () => void
   goPrevious: () => void
   goNext: () => void
   close: () => void
@@ -56,6 +60,8 @@ export interface MediaViewerProps<T extends MediaViewerItem = MediaViewerItem> {
   detailsOpen?: boolean
   defaultDetailsOpen?: boolean
   onDetailsOpenChange?: (open: boolean) => void
+  /** Reset zoom and active gestures when the viewer-owned mobile details sheet opens. @default true */
+  resetZoomOnSheetOpen?: boolean
   ariaLabel?: string
   closeLabel?: string
   previousLabel?: string
@@ -139,6 +145,7 @@ export function MediaViewer<T extends MediaViewerItem>({
   detailsOpen: controlledDetailsOpen,
   defaultDetailsOpen,
   onDetailsOpenChange,
+  resetZoomOnSheetOpen = true,
   ariaLabel = "Media viewer",
   closeLabel = "Close viewer",
   previousLabel = "Previous item",
@@ -154,10 +161,6 @@ export function MediaViewer<T extends MediaViewerItem>({
     () => defaultDetailsOpen ?? !environment.window.matchMedia(NARROW_QUERY).matches,
   )
   const detailsOpen = controlledDetailsOpen ?? internalDetailsOpen
-  const setDetailsOpen = React.useCallback((open: boolean) => {
-    if (controlledDetailsOpen === undefined) setInternalDetailsOpen(open)
-    onDetailsOpenChange?.(open)
-  }, [controlledDetailsOpen, onDetailsOpenChange])
   const item = items[index]
   const [zoom, setZoom] = React.useState<MediaViewerZoom>(MEDIA_VIEWER_NO_ZOOM)
   const [intrinsicSize, setIntrinsicSize] = React.useState<{ width: number; height: number } | null>(null)
@@ -176,13 +179,36 @@ export function MediaViewer<T extends MediaViewerItem>({
     lastTapAt: 0,
   })
 
-  React.useEffect(() => {
+  const resetZoom = React.useCallback(() => {
     setZoom(MEDIA_VIEWER_NO_ZOOM)
+    const state = gesture.current
+    state.pointers.clear()
+    state.startPoint = { x: 0, y: 0 }
+    state.startZoom = MEDIA_VIEWER_NO_ZOOM
+    state.pinchDistance = 0
+    state.pinchMidpoint = { x: 0, y: 0 }
+    state.pinched = false
+    state.moved = false
+    state.lastTapAt = 0
+  }, [])
+
+  const setDetailsOpen = React.useCallback((open: boolean) => {
+    if (controlledDetailsOpen === undefined) setInternalDetailsOpen(open)
+    onDetailsOpenChange?.(open)
+  }, [controlledDetailsOpen, onDetailsOpenChange])
+
+  const viewerSheetOpen = narrow && detailsOpen && Boolean(mobileDetails)
+  const previousViewerSheetOpen = React.useRef(false)
+  React.useLayoutEffect(() => {
+    if (viewerSheetOpen && !previousViewerSheetOpen.current && resetZoomOnSheetOpen) resetZoom()
+    previousViewerSheetOpen.current = viewerSheetOpen
+  }, [resetZoom, resetZoomOnSheetOpen, viewerSheetOpen])
+
+  React.useEffect(() => {
+    resetZoom()
     setIntrinsicSize(null)
     setOriginalLoaded(false)
-    gesture.current.pointers.clear()
-    gesture.current.lastTapAt = 0
-  }, [index, item?.src])
+  }, [index, item?.src, resetZoom])
 
   const goPrevious = React.useCallback(() => {
     if (index > 0) onIndexChange(index - 1)
@@ -197,10 +223,12 @@ export function MediaViewer<T extends MediaViewerItem>({
     itemCount: items.length,
     detailsOpen,
     setDetailsOpen,
+    zoom,
+    resetZoom,
     goPrevious,
     goNext,
     close: onClose,
-  }) : null, [detailsOpen, goNext, goPrevious, index, item, items.length, onClose, setDetailsOpen])
+  }) : null, [detailsOpen, goNext, goPrevious, index, item, items.length, onClose, resetZoom, setDetailsOpen, zoom])
 
   const onKeyDown = React.useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement
@@ -290,8 +318,7 @@ export function MediaViewer<T extends MediaViewerItem>({
       return
     }
     state.lastTapAt = event.timeStamp
-    if (narrow && detailsOpen) setDetailsOpen(false)
-  }, [detailsOpen, goNext, goPrevious, narrow, setDetailsOpen])
+  }, [goNext, goPrevious])
 
   const onPointerCancel = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     gesture.current.pointers.delete(event.pointerId)
@@ -301,7 +328,7 @@ export function MediaViewer<T extends MediaViewerItem>({
 
   const mediaWidth = item.width ?? intrinsicSize?.width ?? stageSize.width
   const mediaHeight = item.height ?? intrinsicSize?.height ?? stageSize.height
-  const mobileSheetOpen = narrow && detailsOpen && Boolean(mobileDetails)
+  const mobileSheetOpen = viewerSheetOpen
   const activeSheetHeight = mobileSheetOpen ? sheetHeight : 0
   const fullMediaHeight = containedHeight(mediaWidth, mediaHeight, stageSize.width, stageSize.height)
   const availableHeight = Math.max(1, stageSize.height - activeSheetHeight)
@@ -310,6 +337,7 @@ export function MediaViewer<T extends MediaViewerItem>({
   const stageOffsetY = narrow ? -activeSheetHeight / 2 : 0
   const sheetState = mobileSheetOpen ? "open" : "closed"
   const zoomed = zoom.scale > 1
+  const showActionRow = narrow ? Boolean(mobileActions || mobileDetails) : Boolean(desktopPanel)
 
   return (
     <DialogPrimitive.Root open modal onOpenChange={(open) => { if (!open) onClose() }}>
@@ -457,33 +485,33 @@ export function MediaViewer<T extends MediaViewerItem>({
               {index + 1} / {items.length}
             </div>
 
-            <div
-              data-slot="media-viewer-action-row"
-              data-sheet-state={sheetState}
-              className={cn(
-                "absolute bottom-[calc(env(safe-area-inset-bottom)+0.5rem)] left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-xl border border-overlay-10 bg-popover px-2 py-2 text-popover-foreground shadow-lg backdrop-blur-sm",
-                !narrow && "bottom-4",
-              )}
-              style={{ opacity: mobileSheetOpen ? 0 : 1, pointerEvents: mobileSheetOpen ? "none" : "auto" }}
-              onPointerDown={(event) => event.stopPropagation()}
-            >
-              {narrow ? renderSlot(mobileActions, context) : (
-                <span className="px-1 text-sm tabular-nums text-text-muted">{index + 1} / {items.length}</span>
-              )}
-              {(narrow ? mobileDetails : desktopPanel) ? (
-                <Button
-                  variant="ghost"
-                  size={narrow ? "sm" : "icon-sm"}
-                  className="text-text-muted hover:bg-overlay-10 hover:text-contrast"
-                  onClick={() => setDetailsOpen(!detailsOpen)}
-                  aria-label={detailsOpen ? `Hide ${detailsLabel.toLowerCase()}` : `Show ${detailsLabel.toLowerCase()}`}
-                  aria-expanded={detailsOpen}
-                >
-                  <i className="ph-bold ph-info" aria-hidden="true" />
-                  {narrow ? detailsLabel : null}
-                </Button>
-              ) : null}
-            </div>
+            {showActionRow ? (
+              <div
+                data-slot="media-viewer-action-row"
+                data-sheet-state={sheetState}
+                className={cn(
+                  "absolute bottom-[calc(env(safe-area-inset-bottom)+0.5rem)] left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-xl border border-overlay-10 bg-popover px-2 py-2 text-popover-foreground shadow-lg backdrop-blur-sm",
+                  !narrow && "bottom-4",
+                )}
+                style={{ opacity: mobileSheetOpen ? 0 : 1, pointerEvents: mobileSheetOpen ? "none" : "auto" }}
+                onPointerDown={(event) => event.stopPropagation()}
+              >
+                {narrow ? renderSlot(mobileActions, context) : null}
+                {(narrow ? mobileDetails : desktopPanel) ? (
+                  <Button
+                    variant="ghost"
+                    size={narrow ? "sm" : "icon-sm"}
+                    className="text-text-muted hover:bg-overlay-10 hover:text-contrast"
+                    onClick={() => setDetailsOpen(!detailsOpen)}
+                    aria-label={detailsOpen ? `Hide ${detailsLabel.toLowerCase()}` : `Show ${detailsLabel.toLowerCase()}`}
+                    aria-expanded={detailsOpen}
+                  >
+                    <i className="ph-bold ph-info" aria-hidden="true" />
+                    {narrow ? detailsLabel : null}
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
           </div>
 
           {!narrow && detailsOpen && desktopPanel ? (
@@ -497,6 +525,8 @@ export function MediaViewer<T extends MediaViewerItem>({
               open={mobileSheetOpen}
               onOpenChange={setDetailsOpen}
               aria-label={detailsLabel}
+              modal={false}
+              closeOnOutsidePress={false}
               onHeightChange={setSheetHeight}
               className="max-h-[60svh]"
             >
