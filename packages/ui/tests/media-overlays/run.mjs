@@ -9,6 +9,19 @@ const fixtureDir = path.dirname(fileURLToPath(import.meta.url))
 const outputDir = path.join(process.env.REDLEAF_SCRATCH_DIR || process.env.TEMP, "ui-media-overlays")
 await mkdir(outputDir, { recursive: true })
 
+async function assertTokenColor(page, selector, property, token) {
+  const values = await page.locator(selector).evaluate((element, { property, token }) => {
+    const probe = document.createElement("div")
+    probe.style.setProperty(property, `var(${token})`)
+    document.body.append(probe)
+    const actual = getComputedStyle(element).getPropertyValue(property)
+    const expected = getComputedStyle(probe).getPropertyValue(property)
+    probe.remove()
+    return { actual, expected }
+  }, { property, token })
+  assert.equal(values.actual, values.expected, `${selector} should use ${token}`)
+}
+
 const server = await createServer({
   root: fixtureDir,
   configFile: path.join(fixtureDir, "vite.config.ts"),
@@ -43,6 +56,27 @@ try {
   await page.locator('[data-slot="sheet-overlay"]').click({ position: { x: 10, y: 10 } })
   await sheet.waitFor({ state: "hidden" })
 
+  await page.goto(`${baseUrl}?component=launcher&theme=light`, { waitUntil: "networkidle" })
+  await page.getByRole("button", { name: "Open viewer" }).click()
+  let modalityViewer = page.locator('[data-slot="media-viewer"]')
+  await modalityViewer.waitFor()
+  let modalityClose = page.getByRole("button", { name: "Close viewer" })
+  assert.equal(await modalityClose.evaluate(element => element.matches(":focus-visible")), false, "pointer opening should not paint a close-button ring")
+  assert.equal(await modalityViewer.evaluate(element => element.contains(document.activeElement)), true, "pointer opening should still move focus into the viewer")
+  await page.keyboard.press("Escape")
+  await modalityViewer.waitFor({ state: "hidden" })
+
+  const viewerTrigger = page.getByRole("button", { name: "Open viewer" })
+  await viewerTrigger.focus()
+  await page.keyboard.press("Enter")
+  modalityViewer = page.locator('[data-slot="media-viewer"]')
+  await modalityViewer.waitFor()
+  modalityClose = page.getByRole("button", { name: "Close viewer" })
+  await page.waitForFunction(() => document.activeElement?.getAttribute("aria-label") === "Close viewer")
+  assert.equal(await modalityClose.evaluate(element => element.matches(":focus-visible")), true, "keyboard opening should retain a visible focus ring")
+  await page.keyboard.press("Escape")
+  await modalityViewer.waitFor({ state: "hidden" })
+
   await page.goto(`${baseUrl}?component=viewer&theme=dark`, { waitUntil: "networkidle" })
   const viewer = page.locator('[data-slot="media-viewer"]')
   await viewer.waitFor()
@@ -69,7 +103,10 @@ try {
   const phoneViewer = phonePage.locator('[data-slot="media-viewer"]')
   const stage = phonePage.locator('[data-slot="media-viewer-stage"]')
   await phonePage.getByRole("button", { name: "Show details" }).click()
-  await phonePage.locator('[data-slot="sheet"]').waitFor()
+  const phoneSheet = phonePage.locator('[data-slot="sheet"]')
+  await phoneSheet.waitFor()
+  const collapseBounds = await phonePage.getByRole("button", { name: "Close Details" }).boundingBox()
+  assert.ok(collapseBounds && collapseBounds.width >= 44 && collapseBounds.height >= 44, "Sheet collapse control should expose a 44px touch target")
   await phonePage.waitForFunction(() => {
     const fit = document.querySelector('[data-slot="media-viewer-media-fit"]')
     return fit instanceof HTMLElement && !fit.style.transform.startsWith("translateY(0px)")
@@ -106,21 +143,19 @@ try {
   assert.deepEqual(errors, [], `browser errors: ${errors.join("\n")}`)
   await phone.close()
 
-  const captures = [
-    { component: "sheet", theme: "light", width: 1440, height: 960 },
-    { component: "sheet", theme: "dark", width: 1440, height: 960 },
-    { component: "sheet", theme: "light", width: 390, height: 844 },
-    { component: "sheet", theme: "dark", width: 390, height: 844 },
-    { component: "viewer", theme: "light", width: 1440, height: 960 },
-    { component: "viewer", theme: "dark", width: 1440, height: 960 },
-    { component: "viewer", theme: "light", width: 390, height: 844, openDetails: true },
-    { component: "viewer", theme: "dark", width: 390, height: 844, openDetails: true },
-  ]
+  const themes = ["light", "dark", "low-contrast", "high-contrast"]
+  const captures = themes.flatMap(theme => [
+    { component: "sheet", theme, width: 1440, height: 960 },
+    { component: "sheet", theme, width: 390, height: 844 },
+    { component: "viewer", theme, width: 1440, height: 960 },
+    { component: "viewer", theme, width: 390, height: 844, openDetails: true },
+  ])
 
   for (const capture of captures) {
     const context = await browser.newContext({ viewport: { width: capture.width, height: capture.height }, hasTouch: capture.width < 768, isMobile: capture.width < 768 })
     const capturePage = await context.newPage()
-    await capturePage.goto(`${baseUrl}?component=${capture.component}&theme=${capture.theme}`, { waitUntil: "networkidle" })
+    await capturePage.goto(`${baseUrl}?component=launcher&theme=${capture.theme}`, { waitUntil: "networkidle" })
+    await capturePage.getByRole("button", { name: capture.component === "viewer" ? "Open viewer" : "Open sheet" }).click()
     if (capture.openDetails) await capturePage.getByRole("button", { name: "Show details" }).click()
     await capturePage.locator(`[data-slot="${capture.component === "viewer" ? "media-viewer" : "sheet"}"]`).waitFor()
     if (capture.component === "viewer") {
@@ -138,9 +173,39 @@ try {
         return fit instanceof HTMLElement && !fit.style.transform.startsWith("translateY(0px)")
       })
     }
+    if (capture.component === "sheet") {
+      await assertTokenColor(capturePage, '[data-slot="sheet"]', "background-color", "--popover")
+    } else {
+      await assertTokenColor(capturePage, '[data-slot="media-viewer-action-row"]', "background-color", "--popover")
+      if (capture.width >= 768) {
+        await assertTokenColor(capturePage, '[data-slot="media-viewer-desktop-panel"]', "background-color", "--color-surface-elevated")
+        const stageBox = await capturePage.locator('[data-slot="media-viewer-stage"]').boundingBox()
+        const closeBox = await capturePage.getByRole("button", { name: "Close viewer" }).boundingBox()
+        assert.ok(stageBox && closeBox && closeBox.x + closeBox.width <= stageBox.x + stageBox.width, "viewer close control should stay on the dark stage")
+      } else {
+        await assertTokenColor(capturePage, '[data-slot="sheet"]', "background-color", "--popover")
+      }
+    }
     const filename = `${capture.component}-${capture.theme}-${capture.width}x${capture.height}.png`
     await capturePage.screenshot({ path: path.join(outputDir, filename), fullPage: true, animations: "disabled" })
     await context.close()
+  }
+
+  for (const theme of ["dark", "low-contrast"]) {
+    for (const token of ["before", "after"]) {
+      const context = await browser.newContext({ viewport: { width: 1440, height: 960 } })
+      const capturePage = await context.newPage()
+      await capturePage.goto(`${baseUrl}?component=contrast&theme=${theme}&token=${token}`, { waitUntil: "networkidle" })
+      for (const surface of ["chat", "item-list", "settings"]) {
+        await capturePage.locator(`[data-audit-surface="${surface}"]`).waitFor()
+      }
+      await capturePage.screenshot({
+        path: path.join(outputDir, `contrast-${theme}-${token}-1440x960.png`),
+        fullPage: true,
+        animations: "disabled",
+      })
+      await context.close()
+    }
   }
 
   console.log(`Component acceptance passed; screenshots: ${outputDir}`)

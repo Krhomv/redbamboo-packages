@@ -1,7 +1,8 @@
 import * as React from "react"
 import { createRoot } from "react-dom/client"
 
-import { Button, MediaViewer, SectionHeader, Sheet, type MediaViewerItem } from "../../src/index"
+import { MaintenanceNotice } from "../../../chat/src/components/maintenance-notice"
+import { Button, ItemListRow, MediaViewer, SectionHeader, SettingRow, Sheet, type MediaViewerItem } from "../../src/index"
 import "./story.css"
 
 function svgData(svg: string) {
@@ -39,27 +40,73 @@ const items: MediaViewerItem[] = [
   { id: "clip", src: "data:video/mp4;base64,AAAA", type: "video", posterSrc: forestImage, alt: "Short forest clip", width: 1600, height: 1067 },
 ]
 
-function Details({ item, darkStage = false }: { item: MediaViewerItem; darkStage?: boolean }) {
+function Details({ item }: { item: MediaViewerItem }) {
   return (
     <div className="flex flex-col gap-4 p-5">
       <div>
-        {darkStage
-          ? <p className="mb-3 text-[11px] font-medium uppercase tracking-wider text-white/50">Media details</p>
-          : <SectionHeader>Media details</SectionHeader>}
+        <SectionHeader>Media details</SectionHeader>
         <h2 className="font-heading text-lg font-medium">{item.alt}</h2>
       </div>
-      <p className={darkStage ? "text-sm leading-relaxed text-white/60" : "text-sm leading-relaxed text-text-muted"}>
+      <p className="text-sm leading-relaxed text-text-muted">
         A representative library item with editorial metadata, curation controls, and a placeholder-backed original.
       </p>
       <div className="grid grid-cols-2 gap-3 text-xs">
-        <div>{darkStage ? <p className="mb-2 text-[10px] uppercase text-white/50">Format</p> : <SectionHeader>Format</SectionHeader>}<span>16 : 10</span></div>
-        <div>{darkStage ? <p className="mb-2 text-[10px] uppercase text-white/50">Source</p> : <SectionHeader>Source</SectionHeader>}<span>Leaf Assets</span></div>
+        <div><SectionHeader>Format</SectionHeader><span>16 : 10</span></div>
+        <div><SectionHeader>Source</SectionHeader><span>Leaf Assets</span></div>
       </div>
       <div className="flex gap-2">
         <Button size="sm">Keep</Button>
-        <Button size="sm" variant="outline" className={darkStage ? "border-white/20 bg-white/5 text-white hover:bg-white/10" : undefined}>Reject</Button>
+        <Button size="sm" variant="outline">Reject</Button>
       </div>
     </div>
+  )
+}
+
+function ContrastAudit() {
+  const maintenance = {
+    state: "draining" as const,
+    paused: true,
+    runId: "visual-audit",
+    startedAt: "2026-10-17T10:00:00Z",
+    changedAt: "2026-10-17T10:00:00Z",
+    activeTurnCount: 2,
+  }
+  return (
+    <main className="min-h-screen bg-background p-8 text-foreground">
+      <div className="mx-auto max-w-6xl">
+        <SectionHeader>Muted text contrast audit</SectionHeader>
+        <h1 className="font-heading text-2xl font-medium">Three production surfaces</h1>
+        <p className="mt-2 text-sm text-text-muted">Actual shared components from chat and the design system.</p>
+        <div className="mt-8 grid gap-6 lg:grid-cols-3">
+          <section data-audit-surface="chat" className="flex min-h-64 flex-col rounded-2xl border border-border-subtle bg-surface-elevated p-5 shadow-sm">
+            <SectionHeader>Chat message footer</SectionHeader>
+            <div className="flex-1 rounded-xl bg-surface-base p-4 text-sm leading-relaxed text-text-primary">
+              The update will wait until active conversations finish, then resume this thread automatically.
+            </div>
+            <div className="-mx-4 mt-5">
+              <MaintenanceNotice status={maintenance} hasServerSession />
+            </div>
+          </section>
+
+          <section data-audit-surface="item-list" className="min-h-64 overflow-hidden rounded-2xl border border-border-subtle bg-surface-elevated shadow-sm">
+            <div className="p-5 pb-2"><SectionHeader>Item-list subtitles</SectionHeader></div>
+            <ItemListRow title="Alpine sunset" subtitle="Generated 12 minutes ago · 1600 × 1067" selected />
+            <ItemListRow title="Moonlit forest" subtitle="Generated yesterday · Editorial pick" />
+            <ItemListRow title="Quiet shoreline" subtitle="Imported from Leaf Assets" />
+          </section>
+
+          <section data-audit-surface="settings" className="min-h-64 rounded-2xl border border-border-subtle bg-surface-elevated p-5 shadow-sm">
+            <SectionHeader>Settings section</SectionHeader>
+            <SettingRow label="Show metadata" hint="Include generation details in the viewer.">
+              <input aria-label="Show metadata" type="checkbox" defaultChecked />
+            </SettingRow>
+            <SettingRow label="Autoplay video" hint="Begin playback when video becomes active.">
+              <input aria-label="Autoplay video" type="checkbox" />
+            </SettingRow>
+          </section>
+        </div>
+      </div>
+    </main>
   )
 }
 
@@ -67,13 +114,23 @@ function Story() {
   const params = new URLSearchParams(window.location.search)
   const component = params.get("component") ?? "viewer"
   const theme = params.get("theme") ?? "light"
+  const token = params.get("token") ?? "after"
   const [sheetOpen, setSheetOpen] = React.useState(component === "sheet")
   const [viewerOpen, setViewerOpen] = React.useState(component === "viewer")
   const [index, setIndex] = React.useState(0)
 
   React.useEffect(() => {
-    document.documentElement.classList.toggle("dark", theme === "dark")
-  }, [theme])
+    const root = document.documentElement
+    root.classList.toggle("dark", theme === "dark" || theme === "high-contrast")
+    if (theme === "low-contrast") root.dataset.contrast = "low"
+    else if (theme === "high-contrast") root.dataset.contrast = "high"
+    else delete root.dataset.contrast
+    if (token === "before" && theme === "dark") root.style.setProperty("--color-text-muted", "#9B9CA2")
+    else if (token === "before" && theme === "low-contrast") root.style.setProperty("--color-text-muted", "#8B919A")
+    else root.style.removeProperty("--color-text-muted")
+  }, [theme, token])
+
+  if (component === "contrast") return <ContrastAudit />
 
   return (
     <main className="min-h-screen bg-background p-6 text-foreground sm:p-10">
@@ -108,12 +165,12 @@ function Story() {
           index={index}
           onIndexChange={setIndex}
           onClose={() => setViewerOpen(false)}
-          desktopPanel={({ item }) => <Details item={item} darkStage />}
+          desktopPanel={({ item }) => <Details item={item} />}
           mobileDetails={({ item }) => <Details item={item} />}
           mobileActions={
             <>
-              <Button size="sm" className="bg-white/10 text-white hover:bg-white/20">Keep</Button>
-              <Button size="sm" variant="ghost" className="text-white/70 hover:bg-white/10 hover:text-white">Reject</Button>
+              <Button size="sm">Keep</Button>
+              <Button size="sm" variant="ghost">Reject</Button>
             </>
           }
         />

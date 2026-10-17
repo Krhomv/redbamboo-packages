@@ -5,10 +5,10 @@ import { test } from "node:test"
 const settingsSource = readFileSync(new URL("./components/settings.tsx", import.meta.url), "utf8")
 
 const themes = {
-  light: { text: "#1F2328", surfaces: ["#FFFFFF", "#FAFBFC", "#FAFBFC"] },
-  dark: { text: "#D0D1D6", surfaces: ["#363842", "#2E3038", "#262830"] },
-  "low-contrast light": { text: "#4D5259", surfaces: ["#F7F8F9", "#F2F3F5", "#F2F3F5"] },
-  "high-contrast dark": { text: "#F0F1F4", surfaces: ["#232530", "#1A1C22", "#111318"] },
+  light: { muted: "#656D76", primary: "#1F2328", surfaces: ["#FFFFFF", "#FAFBFC", "#FAFBFC"] },
+  dark: { muted: "#A2A3A9", primary: "#D0D1D6", surfaces: ["#363842", "#2E3038", "#262830"] },
+  "low-contrast light": { muted: "#686E77", primary: "#4D5259", surfaces: ["#F7F8F9", "#F2F3F5", "#F2F3F5"] },
+  "high-contrast dark": { muted: "#C0C1C6", primary: "#F0F1F4", surfaces: ["#232530", "#1A1C22", "#111318"] },
 }
 
 function luminance(hex) {
@@ -22,15 +22,16 @@ function contrast(a, b) {
   return (lighter + 0.05) / (darker + 0.05)
 }
 
-test("SectionHeader uses the primary text token without changing its compact hierarchy", () => {
-  assert.match(settingsSource, /text-\[11px\][^"\n]*text-text-primary/)
-  assert.doesNotMatch(settingsSource, /data-slot="section-header"[\s\S]{0,160}text-text-muted/)
+test("SectionHeader stays muted without changing its compact hierarchy", () => {
+  assert.match(settingsSource, /text-\[11px\][^"\n]*text-text-muted/)
+  assert.doesNotMatch(settingsSource, /data-slot="section-header"[\s\S]{0,160}text-text-primary/)
 })
 
 test("SectionHeader clears WCAG AA on every supported panel surface", () => {
-  for (const [theme, { text, surfaces }] of Object.entries(themes)) {
+  for (const [theme, { muted, primary, surfaces }] of Object.entries(themes)) {
     for (const surface of surfaces) {
-      assert.ok(contrast(text, surface) >= 4.5, `${theme}: ${text} on ${surface}`)
+      assert.ok(contrast(muted, surface) >= 4.6, `${theme}: ${muted} on ${surface}`)
     }
+    assert.ok(contrast(muted, primary) >= 1.5, `${theme}: muted remains distinct from primary`)
   }
 })

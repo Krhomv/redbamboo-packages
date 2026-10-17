@@ -161,6 +161,8 @@ export function MediaViewer<T extends MediaViewerItem>({
   const [intrinsicSize, setIntrinsicSize] = React.useState<{ width: number; height: number } | null>(null)
   const [originalLoaded, setOriginalLoaded] = React.useState(false)
   const [sheetHeight, setSheetHeight] = React.useState(0)
+  const viewerRef = React.useRef<HTMLDivElement>(null)
+  const closeButtonRef = React.useRef<HTMLButtonElement>(null)
   const stageRef = React.useRef<HTMLDivElement>(null)
   const stageSize = useElementSize(stageRef)
   const gesture = React.useRef<GestureState>({
@@ -318,33 +320,36 @@ export function MediaViewer<T extends MediaViewerItem>({
           className="rb-media-viewer-overlay fixed inset-0 z-[59] bg-black/80"
         />
         <DialogPrimitive.Popup
+          ref={viewerRef}
           data-slot="media-viewer"
           data-motion="composed"
           aria-label={ariaLabel}
-          className={cn("rb-media-viewer fixed inset-0 z-[60] flex bg-black/95 text-white outline-none", narrow && "flex-col", className)}
+          initialFocus={closeButtonRef}
+          className={cn("rb-media-viewer fixed inset-0 z-[60] flex bg-background text-foreground outline-none", narrow && "flex-col", className)}
           onKeyDown={onKeyDown}
         >
-          <Button
-            variant="ghost"
-            size={narrow ? "icon-lg" : "icon"}
-            className="absolute right-3 top-3 z-[65] rounded-full bg-black/40 text-xl text-white/70 hover:bg-black/50 hover:text-white"
-            onClick={onClose}
-            aria-label={closeLabel}
-          >
-            <i className="ph-bold ph-x" aria-hidden="true" />
-          </Button>
-
           <div
             ref={stageRef}
             data-slot="media-viewer-stage"
             data-zoom-scale={zoom.scale}
-            className={cn("relative flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden", stageClassName)}
+            className={cn("relative flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden bg-black/95 text-white", stageClassName)}
             style={item.type === "video" ? undefined : { touchAction: "none" }}
             onPointerDown={item.type === "video" ? undefined : onPointerDown}
             onPointerMove={item.type === "video" ? undefined : onPointerMove}
             onPointerUp={item.type === "video" ? undefined : onPointerUp}
             onPointerCancel={item.type === "video" ? undefined : onPointerCancel}
           >
+            <Button
+              ref={closeButtonRef}
+              variant="ghost"
+              size={narrow ? "icon-lg" : "icon"}
+              className="absolute right-3 top-3 z-[65] rounded-full bg-black/40 text-xl text-white/70 hover:bg-black/50 hover:text-white"
+              onClick={onClose}
+              aria-label={closeLabel}
+            >
+              <i className="ph-bold ph-x" aria-hidden="true" />
+            </Button>
+
             <div
               data-slot="media-viewer-media-fit"
               data-sheet-state={sheetState}
@@ -456,20 +461,20 @@ export function MediaViewer<T extends MediaViewerItem>({
               data-slot="media-viewer-action-row"
               data-sheet-state={sheetState}
               className={cn(
-                "absolute bottom-[calc(env(safe-area-inset-bottom)+0.5rem)] left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-xl border border-white/10 bg-black/60 px-2 py-2 text-white shadow-lg backdrop-blur-sm",
+                "absolute bottom-[calc(env(safe-area-inset-bottom)+0.5rem)] left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-xl border border-overlay-10 bg-popover px-2 py-2 text-popover-foreground shadow-lg backdrop-blur-sm",
                 !narrow && "bottom-4",
               )}
               style={{ opacity: mobileSheetOpen ? 0 : 1, pointerEvents: mobileSheetOpen ? "none" : "auto" }}
               onPointerDown={(event) => event.stopPropagation()}
             >
               {narrow ? renderSlot(mobileActions, context) : (
-                <span className="px-1 text-sm tabular-nums text-white/50">{index + 1} / {items.length}</span>
+                <span className="px-1 text-sm tabular-nums text-text-muted">{index + 1} / {items.length}</span>
               )}
               {(narrow ? mobileDetails : desktopPanel) ? (
                 <Button
                   variant="ghost"
                   size={narrow ? "sm" : "icon-sm"}
-                  className="text-white/60 hover:bg-white/10 hover:text-white"
+                  className="text-text-muted hover:bg-overlay-10 hover:text-contrast"
                   onClick={() => setDetailsOpen(!detailsOpen)}
                   aria-label={detailsOpen ? `Hide ${detailsLabel.toLowerCase()}` : `Show ${detailsLabel.toLowerCase()}`}
                   aria-expanded={detailsOpen}
@@ -482,7 +487,7 @@ export function MediaViewer<T extends MediaViewerItem>({
           </div>
 
           {!narrow && detailsOpen && desktopPanel ? (
-            <aside data-slot="media-viewer-desktop-panel" className="w-80 shrink-0 overflow-y-auto border-l border-white/10 bg-black/60">
+            <aside data-slot="media-viewer-desktop-panel" className="w-80 shrink-0 overflow-y-auto border-l border-overlay-10 bg-surface-elevated text-contrast">
               {renderSlot(desktopPanel, context)}
             </aside>
           ) : null}

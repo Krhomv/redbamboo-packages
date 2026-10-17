@@ -99,7 +99,7 @@ export function Sheet({
           className={cn(sheetVariants({ side }), className)}
           style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         >
-          <div data-slot="sheet-header" className="relative flex h-9 shrink-0 items-center justify-center">
+          <div data-slot="sheet-header" className="relative flex h-11 shrink-0 items-center justify-center">
             <span className="h-1 w-10 rounded-full bg-overlay-20" aria-hidden="true" />
             {showCloseButton ? (
               <DialogPrimitive.Close
@@ -107,12 +107,12 @@ export function Sheet({
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    className="absolute right-2 top-1"
+                    className="absolute right-2 top-0 size-11"
                     aria-label={closeLabel}
                   />
                 }
               >
-                <i className="ph-bold ph-caret-down" aria-hidden="true" />
+                <i className="ph-bold ph-caret-down text-base" aria-hidden="true" />
               </DialogPrimitive.Close>
             ) : null}
           </div>

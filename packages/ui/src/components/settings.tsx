@@ -32,7 +32,7 @@ export function SectionHeader({ children }: { children: ReactNode }) {
   return (
     <div
       data-slot="section-header"
-      className="text-[11px] font-medium text-text-primary uppercase tracking-wider mb-3"
+      className="text-[11px] font-medium text-text-muted uppercase tracking-wider mb-3"
     >
       {children}
     </div>
