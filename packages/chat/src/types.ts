@@ -168,7 +168,7 @@ export interface ChatEvent {
    * See process-stream-event.ts for why the pending question can't be inferred
    * from the parts alone.
    */
-  type: "text" | "thinking" | "tool_use" | "tool_result" | "error" | "status" | "question" | "question_resolved"
+  type: "text" | "thinking" | "tool_use" | "tool_result" | "error" | "status" | "question" | "question_resolved" | "image"
   content?: string | null
   toolName?: string | null
   toolInput?: string | null
@@ -570,6 +570,8 @@ export interface ChatPanelProps {
   resolveEventLink?: (event: import("./components/event-view").ParsedEvent) => (() => void) | undefined
   /** Fetch transcript bytes on demand. Closed tool modals never call it. */
   loadTranscriptPayload?: TranscriptPayloadLoader
+  /** Browser-displayable URL for binary transcript media such as generated images. */
+  getTranscriptPayloadMediaUrl?: (ref: TranscriptPayloadRef) => string
   /** Optional full-output download URL for payload-backed transcript parts. */
   getTranscriptPayloadDownloadUrl?: (ref: TranscriptPayloadRef) => string
   permissionMode?: string

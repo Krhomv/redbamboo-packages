@@ -48,7 +48,7 @@ export function ChatPanel(props: ChatPanelProps) {
     maintenanceStatus, maintenanceStatusUnavailable = false, hasServerSession = Boolean(sessionId),
     hasEarlierMessages = false, onLoadEarlier, isLoadingEarlier = false,
     placeholder, className, header, footer,
-    resolveImageSrc, resolveFileLink, resolveEventLink, loadTranscriptPayload, getTranscriptPayloadDownloadUrl,
+    resolveImageSrc, resolveFileLink, resolveEventLink, loadTranscriptPayload, getTranscriptPayloadMediaUrl, getTranscriptPayloadDownloadUrl,
     permissionMode, onTogglePlanMode, onExecutePlan,
     enableImageAttachments, enableFileAttachments, attachmentTransport, draftStorageKey,
     prepareOutgoingMessage,
@@ -542,6 +542,7 @@ export function ChatPanel(props: ChatPanelProps) {
                   resolveEventLink={resolveEventLink}
                   resolveEventQueueStatus={resolveEventQueueStatus}
                   loadTranscriptPayload={loadTranscriptPayload}
+                  getTranscriptPayloadMediaUrl={getTranscriptPayloadMediaUrl}
                   getTranscriptPayloadDownloadUrl={getTranscriptPayloadDownloadUrl}
                   assistantAvatar={props.assistantAvatar}
                   senderName={row.ownsSender ? senderAgent?.name : undefined}

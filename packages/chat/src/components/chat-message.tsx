@@ -169,6 +169,7 @@ interface ChatMessageProps {
   resolveEventLink?: (event: ParsedEvent) => (() => void) | undefined
   resolveEventQueueStatus?: ResolveEventQueueStatus
   loadTranscriptPayload?: TranscriptPayloadLoader
+  getTranscriptPayloadMediaUrl?: (ref: TranscriptPayloadRef) => string
   getTranscriptPayloadDownloadUrl?: (ref: TranscriptPayloadRef) => string
   assistantAvatar?: string
   senderName?: string
@@ -207,6 +208,7 @@ export const ChatMessage = memo(function ChatMessage({
   resolveEventLink,
   resolveEventQueueStatus,
   loadTranscriptPayload,
+  getTranscriptPayloadMediaUrl,
   getTranscriptPayloadDownloadUrl,
   assistantAvatar,
   senderName,
@@ -461,8 +463,12 @@ export const ChatMessage = memo(function ChatMessage({
               <img
                 src={group.parts[0].url
                   ? resolveChatMediaSrc(group.parts[0].url, resolveImageSrc)
-                  : group.parts[0].base64 ? `data:${group.parts[0].mediaType ?? "image/png"};base64,${group.parts[0].base64}` : ""}
-                alt=""
+                  : group.parts[0].base64
+                    ? `data:${group.parts[0].mediaType ?? "image/png"};base64,${group.parts[0].base64}`
+                    : group.parts[0].payloadRef && getTranscriptPayloadMediaUrl
+                      ? getTranscriptPayloadMediaUrl(group.parts[0].payloadRef)
+                      : ""}
+                alt={group.parts[0].content || "Generated image"}
                 className="max-h-64 rounded-md border border-overlay-10"
               />
             </div>
