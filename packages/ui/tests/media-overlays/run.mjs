@@ -143,18 +143,67 @@ try {
   assert.deepEqual(errors, [], `browser errors: ${errors.join("\n")}`)
   await phone.close()
 
+  for (const media of ["portrait", "landscape"]) {
+    const fitContext = await browser.newContext({
+      viewport: { width: 390, height: 520 },
+      hasTouch: true,
+      isMobile: true,
+      reducedMotion: "reduce",
+    })
+    const fitPage = await fitContext.newPage()
+    await fitPage.goto(`${baseUrl}?component=launcher&theme=light&media=${media}`, { waitUntil: "networkidle" })
+    await fitPage.getByRole("button", { name: "Open viewer" }).click()
+    await fitPage.getByRole("button", { name: "Show details" }).click()
+    await fitPage.locator('[data-slot="sheet"]').waitFor()
+    await fitPage.waitForFunction(() => {
+      const fit = document.querySelector('[data-slot="media-viewer-media-fit"]')
+      return fit instanceof HTMLElement && Number(fit.dataset.fitScale) < 1
+    })
+    await fitPage.waitForFunction(() => {
+      const image = document.querySelector('[data-slot="media-viewer-image"]')
+      return image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0
+    })
+    await fitPage.waitForFunction(() => {
+      const fit = document.querySelector('[data-slot="media-viewer-media-fit"]')
+      return fit instanceof HTMLElement && new DOMMatrix(getComputedStyle(fit).transform).a < 1
+    })
+
+    const geometry = await fitPage.evaluate(() => {
+      const portal = document.querySelector('[data-testid="ui-portal-container"]')
+      const viewer = document.querySelector('[data-slot="media-viewer"]')
+      const fit = document.querySelector('[data-slot="media-viewer-media-fit"]')
+      const image = document.querySelector('[data-slot="media-viewer-image"]')
+      const sheet = document.querySelector('[data-slot="sheet"]')
+      if (!(portal instanceof HTMLElement) || !(viewer instanceof HTMLElement) || !(fit instanceof HTMLElement)
+        || !(image instanceof HTMLImageElement) || !(sheet instanceof HTMLElement)) throw new Error("fit geometry elements missing")
+      const transform = new DOMMatrix(getComputedStyle(fit).transform)
+      return {
+        inPortal: portal.contains(viewer) && portal.contains(sheet),
+        scale: transform.a,
+        imageBottom: image.getBoundingClientRect().bottom,
+        sheetTop: sheet.getBoundingClientRect().top,
+      }
+    })
+    assert.equal(geometry.inPortal, true, `${media} viewer and sheet should render in the UiEnvironment portal`)
+    assert.ok(geometry.scale < 1, `${media} fit scale should shrink while the details sheet is open`)
+    assert.ok(geometry.imageBottom <= geometry.sheetTop + 0.5, `${media} media should end above the details sheet`)
+    await fitContext.close()
+  }
+
   const themes = ["light", "dark", "low-contrast", "high-contrast"]
   const captures = themes.flatMap(theme => [
     { component: "sheet", theme, width: 1440, height: 960 },
     { component: "sheet", theme, width: 390, height: 844 },
     { component: "viewer", theme, width: 1440, height: 960 },
     { component: "viewer", theme, width: 390, height: 844, openDetails: true },
+    { component: "viewer", theme, media: "portrait", width: 390, height: 844, openDetails: true },
   ])
 
   for (const capture of captures) {
     const context = await browser.newContext({ viewport: { width: capture.width, height: capture.height }, hasTouch: capture.width < 768, isMobile: capture.width < 768 })
     const capturePage = await context.newPage()
-    await capturePage.goto(`${baseUrl}?component=launcher&theme=${capture.theme}`, { waitUntil: "networkidle" })
+    const mediaQuery = capture.media ? `&media=${capture.media}` : ""
+    await capturePage.goto(`${baseUrl}?component=launcher&theme=${capture.theme}${mediaQuery}`, { waitUntil: "networkidle" })
     await capturePage.getByRole("button", { name: capture.component === "viewer" ? "Open viewer" : "Open sheet" }).click()
     if (capture.openDetails) await capturePage.getByRole("button", { name: "Show details" }).click()
     await capturePage.locator(`[data-slot="${capture.component === "viewer" ? "media-viewer" : "sheet"}"]`).waitFor()
@@ -186,7 +235,8 @@ try {
         await assertTokenColor(capturePage, '[data-slot="sheet"]', "background-color", "--popover")
       }
     }
-    const filename = `${capture.component}-${capture.theme}-${capture.width}x${capture.height}.png`
+    const mediaSuffix = capture.media ? `-${capture.media}` : ""
+    const filename = `${capture.component}-${capture.theme}${mediaSuffix}-${capture.width}x${capture.height}.png`
     await capturePage.screenshot({ path: path.join(outputDir, filename), fullPage: true, animations: "disabled" })
     await context.close()
   }

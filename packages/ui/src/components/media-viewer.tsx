@@ -92,12 +92,14 @@ function useNarrowViewport() {
   return narrow
 }
 
-function useElementSize(ref: React.RefObject<HTMLElement | null>) {
+function useElementSize<T extends HTMLElement>() {
   const environment = useUiEnvironment()
   const [size, setSize] = React.useState({ width: 1, height: 1 })
+  const observerRef = React.useRef<ResizeObserver | null>(null)
 
-  React.useLayoutEffect(() => {
-    const element = ref.current
+  const setElement = React.useCallback((element: T | null) => {
+    observerRef.current?.disconnect()
+    observerRef.current = null
     if (!element) return
     const report = () => {
       const bounds = element.getBoundingClientRect()
@@ -108,10 +110,10 @@ function useElementSize(ref: React.RefObject<HTMLElement | null>) {
     if (!ResizeObserverCtor) return
     const observer = new ResizeObserverCtor(report)
     observer.observe(element)
-    return () => observer.disconnect()
-  }, [environment.window, ref])
+    observerRef.current = observer
+  }, [environment.window])
 
-  return size
+  return [size, setElement] as const
 }
 
 function containedHeight(mediaWidth: number, mediaHeight: number, boxWidth: number, boxHeight: number) {
@@ -161,10 +163,8 @@ export function MediaViewer<T extends MediaViewerItem>({
   const [intrinsicSize, setIntrinsicSize] = React.useState<{ width: number; height: number } | null>(null)
   const [originalLoaded, setOriginalLoaded] = React.useState(false)
   const [sheetHeight, setSheetHeight] = React.useState(0)
-  const viewerRef = React.useRef<HTMLDivElement>(null)
   const closeButtonRef = React.useRef<HTMLButtonElement>(null)
-  const stageRef = React.useRef<HTMLDivElement>(null)
-  const stageSize = useElementSize(stageRef)
+  const [stageSize, setStage] = useElementSize<HTMLDivElement>()
   const gesture = React.useRef<GestureState>({
     pointers: new Map(),
     startPoint: { x: 0, y: 0 },
@@ -320,7 +320,6 @@ export function MediaViewer<T extends MediaViewerItem>({
           className="rb-media-viewer-overlay fixed inset-0 z-[59] bg-black/80"
         />
         <DialogPrimitive.Popup
-          ref={viewerRef}
           data-slot="media-viewer"
           data-motion="composed"
           aria-label={ariaLabel}
@@ -329,7 +328,7 @@ export function MediaViewer<T extends MediaViewerItem>({
           onKeyDown={onKeyDown}
         >
           <div
-            ref={stageRef}
+            ref={setStage}
             data-slot="media-viewer-stage"
             data-zoom-scale={zoom.scale}
             className={cn("relative flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden bg-black/95 text-white", stageClassName)}
@@ -353,6 +352,7 @@ export function MediaViewer<T extends MediaViewerItem>({
             <div
               data-slot="media-viewer-media-fit"
               data-sheet-state={sheetState}
+              data-fit-scale={sheetFitScale}
               className="rb-media-viewer-fit pointer-events-none absolute inset-0 flex items-center justify-center"
               style={{ transform: `translateY(${stageOffsetY}px) scale(${sheetFitScale})` }}
             >

@@ -2,7 +2,7 @@ import * as React from "react"
 import { createRoot } from "react-dom/client"
 
 import { MaintenanceNotice } from "../../../chat/src/components/maintenance-notice"
-import { Button, ItemListRow, MediaViewer, SectionHeader, SettingRow, Sheet, type MediaViewerItem } from "../../src/index"
+import { Button, ItemListRow, MediaViewer, SectionHeader, SettingRow, Sheet, UiEnvironmentProvider, type MediaViewerItem } from "../../src/index"
 import "./story.css"
 
 function svgData(svg: string) {
@@ -33,6 +33,24 @@ const forestImage = svgData(`
     <g fill="#183a35"><path d="M160 900L360 260L560 900Z"/><path d="M460 940L700 190L940 940Z"/><path d="M850 930L1100 250L1350 930Z"/><path d="M1170 930L1380 350L1590 930Z"/></g>
     <path d="M0 850Q410 760 800 850T1600 820V1067H0Z" fill="#102b2d"/>
   </svg>`)
+
+const portraitImage = svgData(`
+  <svg xmlns="http://www.w3.org/2000/svg" width="720" height="1200" viewBox="0 0 720 1200">
+    <defs><linearGradient id="portrait-sky" x2="0" y2="1"><stop stop-color="#182941"/><stop offset=".52" stop-color="#c37f67"/><stop offset="1" stop-color="#edbd8a"/></linearGradient><linearGradient id="portrait-lake" x2="0" y2="1"><stop stop-color="#426c73"/><stop offset="1" stop-color="#172f39"/></linearGradient></defs>
+    <rect width="720" height="1200" fill="url(#portrait-sky)"/><circle cx="510" cy="255" r="100" fill="#ffd8a2" opacity=".85"/>
+    <path d="M0 720L165 390L305 610L455 315L720 735V880H0Z" fill="#2b3944"/>
+    <path d="M255 665L455 315L620 650L520 570L455 465L385 585Z" fill="#e7e1da" opacity=".9"/>
+    <path d="M0 765L180 570L340 790L535 545L720 775V925H0Z" fill="#31514e"/>
+    <path d="M0 860Q180 805 360 870T720 845V1200H0Z" fill="url(#portrait-lake)"/>
+  </svg>`)
+
+const portraitItem: MediaViewerItem = {
+  id: "portrait",
+  src: portraitImage,
+  alt: "Portrait alpine outfit",
+  width: 720,
+  height: 1200,
+}
 
 const items: MediaViewerItem[] = [
   { id: "alpine", src: alpineImage, placeholderSrc: placeholder, alt: "Warm sunset over an alpine lake", width: 1600, height: 1067 },
@@ -115,6 +133,8 @@ function Story() {
   const component = params.get("component") ?? "viewer"
   const theme = params.get("theme") ?? "light"
   const token = params.get("token") ?? "after"
+  const media = params.get("media") ?? "landscape"
+  const viewerItems = media === "portrait" ? [portraitItem, ...items] : items
   const [sheetOpen, setSheetOpen] = React.useState(component === "sheet")
   const [viewerOpen, setViewerOpen] = React.useState(component === "viewer")
   const [index, setIndex] = React.useState(0)
@@ -161,7 +181,7 @@ function Story() {
 
       {viewerOpen ? (
         <MediaViewer
-          items={items}
+          items={viewerItems}
           index={index}
           onIndexChange={setIndex}
           onClose={() => setViewerOpen(false)}
@@ -179,4 +199,12 @@ function Story() {
   )
 }
 
-createRoot(document.getElementById("root")!).render(<Story />)
+const portalContainer = document.createElement("div")
+portalContainer.dataset.testid = "ui-portal-container"
+document.body.append(portalContainer)
+
+createRoot(document.getElementById("root")!).render(
+  <UiEnvironmentProvider document={document} portalContainer={portalContainer}>
+    <Story />
+  </UiEnvironmentProvider>,
+)
