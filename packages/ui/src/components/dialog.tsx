@@ -60,7 +60,7 @@ function DialogContent({
         data-slot="dialog-content"
         data-motion={motion}
         className={cn(
-          "rb-dialog-content fixed top-1/2 left-1/2 z-50 flex w-[calc(100%-2rem)] flex-col overflow-hidden max-h-[calc(100svh-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-5 text-sm text-popover-foreground ring-1 ring-foreground-a10 outline-none sm:max-w-md",
+          "rb-dialog-content fixed top-1/2 left-1/2 z-50 flex w-[calc(100%-2rem)] flex-col overflow-hidden max-h-[calc(100svh-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl border border-border bg-popover p-5 text-sm text-popover-foreground shadow-(--dialog-shadow) outline-none sm:max-w-md",
           className
         )}
         {...props}

@@ -14,7 +14,7 @@ export function ImageLightbox({ src, alt, onClose }: ImageLightboxProps) {
     <Dialog open={true} onOpenChange={v => { if (!v) onClose() }}>
       <DialogContent
         showCloseButton={false}
-        className="bg-transparent p-0 ring-0 shadow-none rounded-none w-auto max-w-[90vw] gap-0"
+        className="bg-transparent p-0 border-0 ring-0 shadow-none rounded-none w-auto max-w-[90vw] gap-0"
       >
         <img
           data-slot="image-lightbox"

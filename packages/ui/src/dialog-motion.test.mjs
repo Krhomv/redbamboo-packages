@@ -32,3 +32,11 @@ test("dialog width keeps a mobile gutter when consumers override max width", () 
   assert.match(dialogSource, /sm:max-w-md/)
   assert.doesNotMatch(dialogSource, /w-full max-w-\[calc\(100%-2rem\)\]/)
 })
+
+test("dialog frame uses the panel delimiter and a theme-aware floating shadow", () => {
+  assert.match(dialogSource, /border border-border bg-popover/)
+  assert.match(dialogSource, /shadow-\(--dialog-shadow\)/)
+  assert.doesNotMatch(dialogSource, /rb-dialog-content[^"]*ring-1/)
+  assert.match(tokens, /:root \{[\s\S]*?--dialog-shadow:[\s\S]*?\}/)
+  assert.match(tokens, /:root\.dark \{[\s\S]*?--dialog-shadow:[\s\S]*?\}/)
+})

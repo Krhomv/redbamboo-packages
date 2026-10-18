@@ -153,6 +153,12 @@
   --table-header-bg: rgba(0, 0, 0, 0.04);
   --scrollbar-thumb: #C1C3C9;
   --scrollbar-thumb-hover: #A1A3A9;
+
+  /* Floating surfaces: a tight contact shadow, directional depth, then a wide halo. */
+  --dialog-shadow:
+    0 1px 3px rgb(16 24 40 / 0.08),
+    0 12px 32px -8px rgb(16 24 40 / 0.16),
+    0 0 80px rgb(16 24 40 / 0.12);
 }
 
 /* ── Dark palette ──────────────────────────────────────────────────── */
@@ -208,6 +214,11 @@
   --table-header-bg: rgba(255, 255, 255, 0.05);
   --scrollbar-thumb: #43454F;
   --scrollbar-thumb-hover: #555760;
+
+  --dialog-shadow:
+    0 2px 6px rgb(0 0 0 / 0.30),
+    0 16px 40px -8px rgb(0 0 0 / 0.50),
+    0 0 100px rgb(0 0 0 / 0.60);
 }
 
 /* ── Low-contrast light override ───────────────────────────────────── */

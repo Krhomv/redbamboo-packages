@@ -38,7 +38,7 @@ export function ModalBase({ dataModal, ariaLabel, onClose, size = "xl", dataAttr
       aria-label={ariaLabel}
       {...dataAttrs}
     >
-      <Card className={cn("w-full mx-4 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-98 slide-in-from-bottom-8 duration-200", SIZE_MAP[size])}>
+      <Card className={cn("w-full mx-4 max-h-[90vh] overflow-y-auto border border-border ring-0 shadow-(--dialog-shadow) animate-in fade-in zoom-in-98 slide-in-from-bottom-8 duration-200", SIZE_MAP[size])}>
         {children}
       </Card>
     </div>
