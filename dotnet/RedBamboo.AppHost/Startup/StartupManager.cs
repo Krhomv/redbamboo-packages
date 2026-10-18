@@ -1,6 +1,8 @@
 #if WINDOWS
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Text;
 using System.Xml.Linq;
@@ -14,6 +16,18 @@ public static class StartupManager
     private const string TaskSchema = "http://schemas.microsoft.com/windows/2004/02/mit/task";
     private const int FileNotFoundHResult = unchecked((int)0x80070002);
     private const int TaskNotFoundHResult = unchecked((int)0x8004130F);
+
+    // Task Scheduler results that do not mean the launcher failed: running, never run,
+    // queued, ended by the user, or a trigger ignored because an instance was running.
+    private static readonly int[] NonFailureTaskResults =
+    [
+        0,
+        0x00041301,
+        0x00041303,
+        0x00041325,
+        0x00041306,
+        unchecked((int)0x8004131F),
+    ];
 
     public static bool IsEnabled(string appName)
         => GetStatus(appName).Enabled;
@@ -183,6 +197,16 @@ public static class StartupManager
                 false,
                 "wrong_user",
                 "The RedLeaf startup task runs as a different Windows user.");
+        if (string.Equals(
+                registration.RunLevel,
+                "HighestAvailable",
+                StringComparison.OrdinalIgnoreCase))
+            return new(
+                false,
+                true,
+                false,
+                "elevated_task",
+                "The RedLeaf startup task runs with administrator privileges. Turn this setting on again to repair it.");
 
         var expectedArguments = expected.ToTaskArguments();
         var expectedWorkingDirectory =
@@ -201,6 +225,17 @@ public static class StartupManager
                 false,
                 "command_mismatch",
                 "The Windows boot task points to an outdated RedLeaf launcher.");
+
+        // The task definition can be correct while the launch itself fails. Only the
+        // last real run proves that Windows actually started RedLeaf.
+        if (registration.LastResult is { } lastResult
+            && !NonFailureTaskResults.Contains(lastResult))
+            return new(
+                true,
+                true,
+                false,
+                "last_start_failed",
+                $"Windows tried to start RedLeaf, but the startup launcher failed (result 0x{lastResult:X8}). RedLeaf is not verified to start with Windows.");
 
         return new(
             true,
@@ -356,8 +391,57 @@ public static class StartupManager
             triggers?.Elements(ns + "BootTrigger").Any() == true,
             triggers?.Elements(ns + "LogonTrigger").Any() == true,
             principal?.Element(ns + "UserId")?.Value,
-            principal?.Element(ns + "LogonType")?.Value);
+            principal?.Element(ns + "LogonType")?.Value,
+            principal?.Element(ns + "RunLevel")?.Value,
+            QueryLastTaskResult(appName));
     }
+
+    /// <summary>
+    /// Reads the last run result through the Task Scheduler COM API. schtasks only
+    /// exposes it in localized text, so a parse there would break on non-English Windows.
+    /// Returns null when the result cannot be read; the definition checks still apply.
+    /// </summary>
+    private static int? QueryLastTaskResult(string appName)
+    {
+        object? service = null;
+        object? folder = null;
+        object? task = null;
+        try
+        {
+            var serviceType = Type.GetTypeFromProgID("Schedule.Service");
+            if (serviceType is null) return null;
+            service = Activator.CreateInstance(serviceType);
+            if (service is null) return null;
+            Invoke(service, "Connect", BindingFlags.InvokeMethod);
+            folder = Invoke(service, "GetFolder", BindingFlags.InvokeMethod, @"\");
+            task = folder is null
+                ? null
+                : Invoke(folder, "GetTask", BindingFlags.InvokeMethod, TaskName(appName));
+            return task is null
+                ? null
+                : Convert.ToInt32(Invoke(task, "LastTaskResult", BindingFlags.GetProperty));
+        }
+        catch (Exception error) when (error is COMException
+                                       or TargetInvocationException
+                                       or InvalidCastException
+                                       or MissingMemberException)
+        {
+            return null;
+        }
+        finally
+        {
+            foreach (var item in new[] { task, folder, service })
+                if (item is not null && Marshal.IsComObject(item))
+                    Marshal.ReleaseComObject(item);
+        }
+    }
+
+    private static object? Invoke(
+        object target,
+        string member,
+        BindingFlags kind,
+        params object[] arguments)
+        => target.GetType().InvokeMember(member, kind, null, target, arguments);
 
     private static void RunElevatedSchtasks(
         params string[] arguments)
@@ -457,7 +541,9 @@ internal sealed record ScheduledStartupRegistration(
     bool HasBootTrigger,
     bool HasLogonTrigger,
     string? UserId,
-    string? LogonType);
+    string? LogonType,
+    string? RunLevel = null,
+    int? LastResult = null);
 
 public sealed record StartupRegistrationStatus(
     bool Enabled,
