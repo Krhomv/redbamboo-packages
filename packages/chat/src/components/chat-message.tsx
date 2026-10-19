@@ -696,7 +696,7 @@ function PartNavigationControls({ navigation }: { navigation: PartNavigation }) 
   const atStart = position === 0
   const atEnd = position === total - 1
   return (
-    <div role="group" aria-label="Activity navigation" className="flex items-center">
+    <div role="group" aria-label="Activity navigation" className="flex items-center gap-1">
       <button type="button" onClick={e => { if (!atStart) onStep(-1, dialogHeightOf(e.currentTarget)) }} aria-disabled={atStart || undefined} className={buttonClass} aria-label="Previous activity" title="Previous (←)">
         <i className="ph-bold ph-caret-left text-xs" />
       </button>
