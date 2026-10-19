@@ -1,5 +1,5 @@
 import { EventQueueStatusBar, type ResolveEventQueueStatus } from "./event-queue-status"
-import { memo, useState, useRef, useEffect, useCallback } from "react"
+import { memo, useState, useRef, useEffect, useCallback, useContext } from "react"
 import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import rehypeHighlight from "rehype-highlight"
@@ -30,6 +30,8 @@ import { AttachmentCard } from "./attachment-card"
 import { parseNovaEvent } from "../lib/nova-event"
 import { NovaEventSquare } from "./nova-event-square"
 import { getAgentJobHref } from "../lib/session-resource-links"
+import { squarePosition, squareSequence, stepSquare, type SquareRef, type SquareRow } from "../lib/part-navigation"
+import { ActivityRowsContext } from "./activity-rows-context"
 
 const COLOR = {
   thinking: "var(--color-domain-imagination, #7C4DFF)",
@@ -474,7 +476,7 @@ export const ChatMessage = memo(function ChatMessage({
             </div>
           ) : (
             <div key={i} className="msg-enter-ai">
-              <PartFrieze parts={group.parts} allParts={block.parts} isLive={group.kind === "frieze" && group.isLive} resolveFileLink={resolveFileLink} resolveImageSrc={resolveImageSrc} resolveEventLink={resolveEventLink} resolveEventQueueStatus={resolveEventQueueStatus} loadTranscriptPayload={loadTranscriptPayload} getTranscriptPayloadDownloadUrl={getTranscriptPayloadDownloadUrl} />
+              <PartFrieze blockId={block.id} parts={group.parts} allParts={block.parts} isLive={group.kind === "frieze" && group.isLive} resolveFileLink={resolveFileLink} resolveImageSrc={resolveImageSrc} resolveEventLink={resolveEventLink} resolveEventQueueStatus={resolveEventQueueStatus} loadTranscriptPayload={loadTranscriptPayload} getTranscriptPayloadDownloadUrl={getTranscriptPayloadDownloadUrl} />
             </div>
           )
         )}
@@ -552,7 +554,7 @@ function partLabel(part: MessagePart): string {
   }
 }
 
-function findPairedResult(allParts: MessagePart[], toolUsePart: MessagePart): MessagePart | undefined {
+function findPairedResult(allParts: readonly MessagePart[], toolUsePart: MessagePart): MessagePart | undefined {
   const idx = allParts.indexOf(toolUsePart)
   if (idx === -1) return undefined
   for (let j = idx + 1; j < allParts.length; j++) {
@@ -562,7 +564,8 @@ function findPairedResult(allParts: MessagePart[], toolUsePart: MessagePart): Me
   return undefined
 }
 
-function PartFrieze({ parts, allParts, isLive, resolveFileLink, resolveImageSrc, resolveEventLink, resolveEventQueueStatus, loadTranscriptPayload, getTranscriptPayloadDownloadUrl }: {
+function PartFrieze({ blockId, parts, allParts, isLive, resolveFileLink, resolveImageSrc, resolveEventLink, resolveEventQueueStatus, loadTranscriptPayload, getTranscriptPayloadDownloadUrl }: {
+  blockId: string
   parts: MessagePart[]
   allParts: MessagePart[]
   isLive?: boolean
@@ -573,23 +576,53 @@ function PartFrieze({ parts, allParts, isLive, resolveFileLink, resolveImageSrc,
   loadTranscriptPayload?: TranscriptPayloadLoader
   getTranscriptPayloadDownloadUrl?: (ref: TranscriptPayloadRef) => string
 }) {
-  const [selected, setSelected] = useState<{ part: MessagePart; result?: MessagePart; index: number } | null>(null)
+  const [selected, setSelected] = useState<{ part: MessagePart; result?: MessagePart; rowId: string; index: number } | null>(null)
   const retainedSelection = useRef<typeof selected>(null)
   if (selected) retainedSelection.current = selected
   const modalSelection = selected ?? retainedSelection.current
+  // The dialog is centred, so a shorter part would pull the arrows out from
+  // under the pointer. Ratchet the height up while stepping; reset on reopen.
+  const [minHeight, setMinHeight] = useState(0)
+
+  // Stepping walks every square the panel renders, past commentary into the
+  // neighbouring activity rows. This row always reads its own current parts.
+  const getActivityRows = useContext(ActivityRowsContext)
+  const squareRows = (): readonly SquareRow[] => {
+    const rows = getActivityRows?.() ?? []
+    return rows.some(row => row.id === blockId)
+      ? rows.map(row => row.id === blockId ? { id: blockId, parts: allParts } : row)
+      : [{ id: blockId, parts: allParts }]
+  }
+  const rowParts = (rowId: string): readonly MessagePart[] =>
+    rowId === blockId ? allParts : squareRows().find(row => row.id === rowId)?.parts ?? []
 
   // An opened thinking detail must follow immutable live item updates.
-  const currentThinking = modalSelection?.part.type === "thinking" ? allParts[modalSelection.index] : undefined
+  const currentThinking = modalSelection?.part.type === "thinking" ? rowParts(modalSelection.rowId)[modalSelection.index] : undefined
   const selectedPart = currentThinking?.type === "thinking" && currentThinking.messageId === modalSelection?.part.messageId
     ? currentThinking : modalSelection?.part
 
-  const handleClick = (part: MessagePart) => {
-    if (part.type === "tool_use") {
-      setSelected({ part, result: findPairedResult(allParts, part), index: allParts.indexOf(part) })
-    } else {
-      setSelected({ part, index: allParts.indexOf(part) })
-    }
+  const select = ({ rowId, index }: SquareRef) => {
+    const parts = rowParts(rowId)
+    const part = parts[index]
+    setSelected({ part, result: part.type === "tool_use" ? findPairedResult(parts, part) : undefined, rowId, index })
   }
+  const handleClick = (part: MessagePart) => {
+    setMinHeight(0)
+    select({ rowId: blockId, index: allParts.indexOf(part) })
+  }
+
+  const sequence = modalSelection ? squareSequence(squareRows()) : []
+  const position = modalSelection ? squarePosition(sequence, modalSelection) : -1
+  const step = (direction: -1 | 1, dialogHeight: number) => {
+    if (!modalSelection) return
+    const next = stepSquare(squareRows(), modalSelection, direction)
+    if (!next) return
+    setMinHeight(h => Math.max(h, dialogHeight))
+    select(next)
+  }
+  const navigation: PartNavigation | undefined = position !== -1 && sequence.length > 1
+    ? { position, total: sequence.length, onStep: step }
+    : undefined
 
   return (
     <>
@@ -619,7 +652,7 @@ function PartFrieze({ parts, allParts, isLive, resolveFileLink, resolveImageSrc,
         })}
       </div>
 
-      <PartModal part={selectedPart} pairedResult={modalSelection?.result} open={!!selected} onClose={() => setSelected(null)} resolveFileLink={resolveFileLink} resolveImageSrc={resolveImageSrc} resolveEventLink={resolveEventLink} resolveEventQueueStatus={resolveEventQueueStatus} loadTranscriptPayload={loadTranscriptPayload} getTranscriptPayloadDownloadUrl={getTranscriptPayloadDownloadUrl} />
+      <PartModal part={selectedPart} pairedResult={modalSelection?.result} open={!!selected} onClose={() => setSelected(null)} navigation={navigation} minHeight={minHeight} resolveFileLink={resolveFileLink} resolveImageSrc={resolveImageSrc} resolveEventLink={resolveEventLink} resolveEventQueueStatus={resolveEventQueueStatus} loadTranscriptPayload={loadTranscriptPayload} getTranscriptPayloadDownloadUrl={getTranscriptPayloadDownloadUrl} />
     </>
   )
 }
@@ -648,11 +681,51 @@ function extractToolFile(part: MessagePart): { path: string; line?: number } | n
   }
 }
 
-function PartModal({ part, pairedResult, open, onClose, resolveFileLink, resolveImageSrc, resolveEventLink, resolveEventQueueStatus, loadTranscriptPayload, getTranscriptPayloadDownloadUrl }: {
+interface PartNavigation {
+  position: number
+  total: number
+  /** `dialogHeight` is the open dialog's current height, held while stepping. */
+  onStep: (direction: -1 | 1, dialogHeight: number) => void
+}
+
+function PartNavigationControls({ navigation }: { navigation: PartNavigation }) {
+  const { position, total, onStep } = navigation
+  // aria-disabled rather than disabled: a button that disables under focus
+  // drops focus out of the dialog, and the arrow keys would stop working.
+  const buttonClass = "inline-flex size-6 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-overlay-10 hover:text-contrast aria-disabled:cursor-default aria-disabled:opacity-30 aria-disabled:hover:bg-transparent aria-disabled:hover:text-text-muted"
+  const atStart = position === 0
+  const atEnd = position === total - 1
+  return (
+    <div role="group" aria-label="Activity navigation" className="flex items-center">
+      <button type="button" onClick={e => { if (!atStart) onStep(-1, dialogHeightOf(e.currentTarget)) }} aria-disabled={atStart || undefined} className={buttonClass} aria-label="Previous activity" title="Previous (←)">
+        <i className="ph-bold ph-caret-left text-xs" />
+      </button>
+      <span className="min-w-[3.25rem] text-center font-mono text-[10px] tabular-nums text-text-disabled">
+        {position + 1} / {total}
+      </span>
+      <button type="button" onClick={e => { if (!atEnd) onStep(1, dialogHeightOf(e.currentTarget)) }} aria-disabled={atEnd || undefined} className={buttonClass} aria-label="Next activity" title="Next (→)">
+        <i className="ph-bold ph-caret-right text-xs" />
+      </button>
+    </div>
+  )
+}
+
+function dialogHeightOf(element: HTMLElement): number {
+  return element.closest<HTMLElement>("[data-slot=\"dialog-content\"]")?.offsetHeight ?? 0
+}
+
+function isEditableTarget(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement
+    && (target.isContentEditable || target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT")
+}
+
+function PartModal({ part, pairedResult, open, onClose, navigation, minHeight, resolveFileLink, resolveImageSrc, resolveEventLink, resolveEventQueueStatus, loadTranscriptPayload, getTranscriptPayloadDownloadUrl }: {
   part?: MessagePart
   pairedResult?: MessagePart
   open: boolean
   onClose: () => void
+  navigation?: PartNavigation
+  minHeight?: number
   resolveFileLink?: (filePath: string, opts?: { line?: number }) => (() => void) | undefined
   resolveImageSrc?: (src: string) => string | undefined
   resolveEventLink?: (event: ParsedEvent) => (() => void) | undefined
@@ -672,10 +745,18 @@ function PartModal({ part, pairedResult, open, onClose, resolveFileLink, resolve
   const toolFile = resolveFileLink ? extractToolFile(part) : null
   const openFile = toolFile ? resolveFileLink?.(toolFile.path, { line: toolFile.line }) : undefined
 
+  const onKeyDown = navigation ? (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return
+    if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || isEditableTarget(e.target)) return
+    e.preventDefault()
+    navigation.onStep(e.key === "ArrowLeft" ? -1 : 1, e.currentTarget.offsetHeight)
+  } : undefined
+  const heldHeight = (maxHeight: string) => minHeight ? `min(${minHeight}px, ${maxHeight})` : undefined
+
   if (event) {
     return (
       <Dialog open={open} onOpenChange={v => { if (!v) onClose() }}>
-        <DialogContent motion="snappy" className="max-w-md sm:max-w-lg max-h-[70vh] flex flex-col p-0 gap-0">
+        <DialogContent motion="snappy" onKeyDown={onKeyDown} className="max-w-md sm:max-w-lg max-h-[70vh] flex flex-col p-0 gap-0" style={{ minHeight: heldHeight("70vh") }}>
           <DialogHeader className="flex-row items-center gap-2.5 px-4 py-3 border-b border-border-subtle shrink-0">
             <div
               className="w-3 h-3 rounded-full"
@@ -683,10 +764,15 @@ function PartModal({ part, pairedResult, open, onClose, resolveFileLink, resolve
             />
             {event.icon && <i className={`${event.icon} text-sm`} style={{ color: event.color ?? undefined }} />}
             <DialogTitle className="text-sm capitalize">{event.key}</DialogTitle>
-            {event.timestamp && (
-              <span className="ml-auto mr-7 text-[10px] font-mono text-text-disabled">
-                {formatTimestamp(event.timestamp)}
-              </span>
+            {(event.timestamp || navigation) && (
+              <div className="ml-auto mr-7 flex items-center gap-2">
+                {event.timestamp && (
+                  <span className="text-[10px] font-mono text-text-disabled">
+                    {formatTimestamp(event.timestamp)}
+                  </span>
+                )}
+                {navigation && <PartNavigationControls navigation={navigation} />}
+              </div>
             )}
           </DialogHeader>
 
@@ -708,8 +794,9 @@ function PartModal({ part, pairedResult, open, onClose, resolveFileLink, resolve
     <Dialog open={open} onOpenChange={v => { if (!v) onClose() }}>
       <DialogContent
         motion="snappy"
+        onKeyDown={onKeyDown}
         className="flex flex-col p-0 gap-0"
-        style={{ maxWidth: "min(42rem, calc(100vw - 2rem))", maxHeight: "82vh" }}
+        style={{ maxWidth: "min(42rem, calc(100vw - 2rem))", maxHeight: "82vh", minHeight: heldHeight("82vh") }}
       >
         <DialogHeader className="flex-row items-center gap-2.5 px-4 py-3 border-b border-border-subtle shrink-0">
           <div
@@ -722,27 +809,32 @@ function PartModal({ part, pairedResult, open, onClose, resolveFileLink, resolve
               {category}
             </span>
           )}
-          {openFile && (
-            <button
-              onClick={() => { onClose(); openFile() }}
-              className="ml-auto mr-7 inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md bg-overlay-6 text-text-muted hover:bg-overlay-10 hover:text-contrast transition-colors"
-              title={`Open ${toolFile!.path} in the editor`}
-            >
-              <i className="ph ph-code text-[11px]" />
-              Open
-            </button>
-          )}
-          {agentJobHref && (
-            <a
-              href={agentJobHref}
-              onClick={onClose}
-              className="ml-auto mr-7 inline-flex items-center gap-1.5 rounded-md bg-overlay-6 px-2.5 py-1 text-xs text-text-muted transition-colors hover:bg-overlay-10 hover:text-contrast"
-              aria-label="Open job in Compute"
-              title="Open job in Compute"
-            >
-              <i className="ph ph-arrow-square-out text-[11px]" />
-              Compute
-            </a>
+          {(openFile || agentJobHref || navigation) && (
+            <div className="ml-auto mr-7 flex items-center gap-2">
+              {openFile && (
+                <button
+                  onClick={() => { onClose(); openFile() }}
+                  className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md bg-overlay-6 text-text-muted hover:bg-overlay-10 hover:text-contrast transition-colors"
+                  title={`Open ${toolFile!.path} in the editor`}
+                >
+                  <i className="ph ph-code text-[11px]" />
+                  Open
+                </button>
+              )}
+              {agentJobHref && (
+                <a
+                  href={agentJobHref}
+                  onClick={onClose}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-overlay-6 px-2.5 py-1 text-xs text-text-muted transition-colors hover:bg-overlay-10 hover:text-contrast"
+                  aria-label="Open job in Compute"
+                  title="Open job in Compute"
+                >
+                  <i className="ph ph-arrow-square-out text-[11px]" />
+                  Compute
+                </a>
+              )}
+              {navigation && <PartNavigationControls navigation={navigation} />}
+            </div>
           )}
         </DialogHeader>
 

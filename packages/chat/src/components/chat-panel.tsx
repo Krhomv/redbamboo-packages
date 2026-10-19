@@ -7,6 +7,8 @@ import { ChatMessage, extractPlanFileContent } from "./chat-message"
 import { eventQueueStatus, type ResolveEventQueueStatus } from "./event-queue-status"
 import { isEventBlock, eventInputMessageUid } from "../lib/event-parts"
 import { projectActivityTimeline } from "../lib/activity-timeline"
+import type { SquareRow } from "../lib/part-navigation"
+import { ActivityRowsContext } from "./activity-rows-context"
 import { Composer, type ComposerHandle } from "./composer"
 import { QueuedMessageGhost } from "./queued-message-ghost"
 import { canonicalUserMessageUids, isCanonicalQueuedMessage, queuedMessageTimelineTimestamp, type QueuedMessage } from "../lib/message-queue"
@@ -169,6 +171,9 @@ export function ChatPanel(props: ChatPanelProps) {
       onSendNow={handleSendQueued}
     />
   ), [messageQueue.cancel, handleEditQueued, handleSendQueued])
+
+  const activityRowsRef = useRef<SquareRow[]>([])
+  const getActivityRows = useCallback(() => activityRowsRef.current, [])
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
@@ -459,6 +464,9 @@ export function ChatPanel(props: ChatPanelProps) {
 
   const visibleMessages = startIndex > 0 ? messages.slice(startIndex) : messages
   const timelineRows = projectActivityTimeline(visibleMessages, startIndex)
+  activityRowsRef.current = timelineRows
+    .filter(row => row.kind === "activity")
+    .map(row => ({ id: row.block.id, parts: row.block.parts }))
   const inlineOutgoing = visibleOutgoing.filter(item => item.appearance === "message" || item.remoteState === "delivered")
   const waitingOutgoing = visibleOutgoing.filter(item => item.appearance !== "message" && item.remoteState !== "delivered")
   const inlineTimeline = [
@@ -509,52 +517,54 @@ export function ChatPanel(props: ChatPanelProps) {
                 <span className="h-px flex-1 bg-overlay-6" />
               </button>
             )}
-            {visualTimeline.map((visual) => {
-              if (visual.kind === "status") return <div key={visual.key}>{statusLine}</div>
-              if (visual.kind === "outgoing") return renderQueuedGhost(visual.item)
-              const row = visual.row
-              const block = row.block
-              const index = row.sourceIndices[row.sourceIndices.length - 1] ?? 0
-              const isLastAssistant = row.sourceIndices.includes(lastAssistantIndex)
-              const reconcilesAnimatedOutgoing = block.role === "user" && settledUids.includes(String(block.id))
-              const senderAgent = block.senderAgentId && props.resolveAgentInfo
-                ? props.resolveAgentInfo(block.senderAgentId)
-                : undefined
-              return (
-                <ChatMessage
-                  key={visual.key}
-                  block={block}
-                  // Only the canonical replacement for an outgoing bridge has
-                  // already animated. Historical user rows should enter beside
-                  // assistant content whenever a conversation is revealed.
-                  animateEntrance={isConversationEntrance || !reconcilesAnimatedOutgoing}
-                  blockIndex={index}
-                  isStreaming={isStreaming && isLastAssistant}
-                  isLastAssistantBlock={isLastAssistant}
-                  permissionMode={permissionMode}
-                  onExecutePlan={onExecutePlan}
-                  planFileContent={hasExitPlanPart(block) ? planFileContent : null}
-                  isPendingQuestion={isLastAssistant && !!pendingQuestion}
-                  questionOutcome={isLastAssistant ? questionOutcome : undefined}
-                  onAnswerQuestion={isLastAssistant && pendingQuestion ? onAnswerQuestion : undefined}
-                  resolveImageSrc={resolveImageSrc}
-                  resolveFileLink={resolveFileLink}
-                  resolveEventLink={resolveEventLink}
-                  resolveEventQueueStatus={resolveEventQueueStatus}
-                  loadTranscriptPayload={loadTranscriptPayload}
-                  getTranscriptPayloadMediaUrl={getTranscriptPayloadMediaUrl}
-                  getTranscriptPayloadDownloadUrl={getTranscriptPayloadDownloadUrl}
-                  assistantAvatar={props.assistantAvatar}
-                  senderName={row.ownsSender ? senderAgent?.name : undefined}
-                  senderAvatarUrl={row.ownsSender ? senderAgent?.avatarUrl : undefined}
-                  senderPresentation={props.senderPresentation}
-                  renderExtra={row.ownsActions ? renderMessageExtra : undefined}
-                  renderSideActions={row.ownsActions ? renderSideActions : undefined}
-                  compactAfter={row.compactAfter}
-                  showActions={row.ownsActions}
-                />
-              )
-            })}
+            <ActivityRowsContext.Provider value={getActivityRows}>
+              {visualTimeline.map((visual) => {
+                if (visual.kind === "status") return <div key={visual.key}>{statusLine}</div>
+                if (visual.kind === "outgoing") return renderQueuedGhost(visual.item)
+                const row = visual.row
+                const block = row.block
+                const index = row.sourceIndices[row.sourceIndices.length - 1] ?? 0
+                const isLastAssistant = row.sourceIndices.includes(lastAssistantIndex)
+                const reconcilesAnimatedOutgoing = block.role === "user" && settledUids.includes(String(block.id))
+                const senderAgent = block.senderAgentId && props.resolveAgentInfo
+                  ? props.resolveAgentInfo(block.senderAgentId)
+                  : undefined
+                return (
+                  <ChatMessage
+                    key={visual.key}
+                    block={block}
+                    // Only the canonical replacement for an outgoing bridge has
+                    // already animated. Historical user rows should enter beside
+                    // assistant content whenever a conversation is revealed.
+                    animateEntrance={isConversationEntrance || !reconcilesAnimatedOutgoing}
+                    blockIndex={index}
+                    isStreaming={isStreaming && isLastAssistant}
+                    isLastAssistantBlock={isLastAssistant}
+                    permissionMode={permissionMode}
+                    onExecutePlan={onExecutePlan}
+                    planFileContent={hasExitPlanPart(block) ? planFileContent : null}
+                    isPendingQuestion={isLastAssistant && !!pendingQuestion}
+                    questionOutcome={isLastAssistant ? questionOutcome : undefined}
+                    onAnswerQuestion={isLastAssistant && pendingQuestion ? onAnswerQuestion : undefined}
+                    resolveImageSrc={resolveImageSrc}
+                    resolveFileLink={resolveFileLink}
+                    resolveEventLink={resolveEventLink}
+                    resolveEventQueueStatus={resolveEventQueueStatus}
+                    loadTranscriptPayload={loadTranscriptPayload}
+                    getTranscriptPayloadMediaUrl={getTranscriptPayloadMediaUrl}
+                    getTranscriptPayloadDownloadUrl={getTranscriptPayloadDownloadUrl}
+                    assistantAvatar={props.assistantAvatar}
+                    senderName={row.ownsSender ? senderAgent?.name : undefined}
+                    senderAvatarUrl={row.ownsSender ? senderAgent?.avatarUrl : undefined}
+                    senderPresentation={props.senderPresentation}
+                    renderExtra={row.ownsActions ? renderMessageExtra : undefined}
+                    renderSideActions={row.ownsActions ? renderSideActions : undefined}
+                    compactAfter={row.compactAfter}
+                    showActions={row.ownsActions}
+                  />
+                )
+              })}
+            </ActivityRowsContext.Provider>
           </div>
         </div>
 

@@ -33,6 +33,7 @@
     "lint": "echo ok",
     "test": "node --experimental-strip-types --test \"src/**/*.test.ts\"",
     "test:queue-ui": "node tests/queue-presentation/run.cjs",
+    "test:part-navigation": "node tests/part-navigation/run.cjs",
     "clean": "rimraf dist"
   },
   "peerDependencies": {
