@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Management;
+using System.Reflection;
 using System.Runtime.Versioning;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 
@@ -8,9 +10,16 @@ namespace RedBamboo.AppHost.Tunnel;
 
 public sealed class CloudflareTunnelService : IAsyncDisposable
 {
+    private const string StateFileName = "cloudflared-process.json";
+    private static readonly Regex LegacyTokenArgument = new(
+        "(?:^|\\s)--token(?:=|\\s+)(?:\\\"(?<quoted>[^\\\"]*)\\\"|(?<plain>\\S+))",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
     private Process? _process;
+    private TunnelProcessIdentity? _processIdentity;
     private readonly Lock _lock = new();
     private readonly ILogger? _logger;
+    private readonly string _stateFilePath;
 
     public TunnelStatus Status { get; private set; } = TunnelStatus.Stopped;
     public bool IsExternal { get; private set; }
@@ -19,7 +28,15 @@ public sealed class CloudflareTunnelService : IAsyncDisposable
     public event Action<TunnelStatus, string?>? StatusChanged;
 
     public CloudflareTunnelService(ILogger<CloudflareTunnelService>? logger = null)
+        : this(GetDefaultStateFilePath(), logger)
     {
+    }
+
+    internal CloudflareTunnelService(
+        string stateFilePath,
+        ILogger<CloudflareTunnelService>? logger = null)
+    {
+        _stateFilePath = stateFilePath;
         _logger = logger;
     }
 
@@ -38,9 +55,13 @@ public sealed class CloudflareTunnelService : IAsyncDisposable
 
             if (OperatingSystem.IsWindows())
             {
-                if (config.DetectExternalTunnel && DetectTunnelWithToken(config.TunnelToken))
+                // Environment blocks of unrelated processes are intentionally not inspected.
+                // DetectExternalTunnel can therefore recognize only legacy connectors that
+                // still expose an exact --token argument on their command line.
+                if (config.DetectExternalTunnel && DetectLegacyTunnelWithToken(config.TunnelToken))
                 {
-                    _logger?.LogInformation("Detected existing cloudflared process for this tunnel, using external");
+                    _logger?.LogInformation(
+                        "Detected existing legacy cloudflared process for this tunnel, using external");
                     IsExternal = true;
                     SetStatus(TunnelStatus.Running, null);
                     return Task.FromResult(true);
@@ -60,15 +81,7 @@ public sealed class CloudflareTunnelService : IAsyncDisposable
             IsExternal = false;
             SetStatus(TunnelStatus.Starting, null);
 
-            var psi = new ProcessStartInfo
-            {
-                FileName = exe,
-                Arguments = $"tunnel run --token {config.TunnelToken}",
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-            };
+            var psi = CreateStartInfo(exe, config.TunnelToken);
 
             _process = new Process { StartInfo = psi, EnableRaisingEvents = true };
             _process.OutputDataReceived += OnData;
@@ -78,14 +91,22 @@ public sealed class CloudflareTunnelService : IAsyncDisposable
             try
             {
                 _process.Start();
+                _processIdentity = new TunnelProcessIdentity(
+                    _process.Id,
+                    _process.StartTime.ToUniversalTime().Ticks);
+                SaveProcessIdentity(_processIdentity);
                 _process.BeginOutputReadLine();
                 _process.BeginErrorReadLine();
                 _logger?.LogInformation("Started cloudflared tunnel process (PID {Pid})", _process.Id);
             }
             catch (Exception ex)
             {
+                TryKillStartedProcess();
                 _process = null;
-                SetStatus(TunnelStatus.Error, $"Failed to start cloudflared: {ex.Message}");
+                _processIdentity = null;
+                _logger?.LogWarning(
+                    "Failed to start cloudflared process ({ErrorType})", ex.GetType().Name);
+                SetStatus(TunnelStatus.Error, "Failed to start cloudflared");
                 return Task.FromResult(false);
             }
 
@@ -119,6 +140,46 @@ public sealed class CloudflareTunnelService : IAsyncDisposable
         return ValueTask.CompletedTask;
     }
 
+    internal static ProcessStartInfo CreateStartInfo(string executablePath, string token)
+    {
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = executablePath,
+            Arguments = "tunnel run",
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            WindowStyle = ProcessWindowStyle.Hidden,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        startInfo.Environment["TUNNEL_TOKEN"] = token;
+        return startInfo;
+    }
+
+    internal static bool IsOwnedProcess(
+        TunnelProcessIdentity identity,
+        int processId,
+        long startTimeUtcTicks,
+        string processName)
+        => identity.ProcessId == processId
+           && identity.StartTimeUtcTicks == startTimeUtcTicks
+           && string.Equals(processName, "cloudflared", StringComparison.OrdinalIgnoreCase);
+
+    internal static bool CommandLineContainsLegacyToken(string commandLine, string token)
+    {
+        if (string.IsNullOrEmpty(commandLine) || string.IsNullOrEmpty(token)) return false;
+
+        foreach (Match match in LegacyTokenArgument.Matches(commandLine))
+        {
+            var candidate = match.Groups["quoted"].Success
+                ? match.Groups["quoted"].Value
+                : match.Groups["plain"].Value;
+            if (string.Equals(candidate, token, StringComparison.Ordinal)) return true;
+        }
+
+        return false;
+    }
+
     private void OnData(object sender, DataReceivedEventArgs e)
     {
         if (e.Data == null) return;
@@ -137,7 +198,22 @@ public sealed class CloudflareTunnelService : IAsyncDisposable
     {
         lock (_lock)
         {
-            var exitCode = _process?.ExitCode;
+            if (sender is not Process exitedProcess || !ReferenceEquals(_process, exitedProcess))
+                return;
+
+            int? exitCode = null;
+            try
+            {
+                exitCode = exitedProcess?.ExitCode;
+            }
+            catch
+            {
+                // Best-effort status detail only.
+            }
+
+            if (_processIdentity is not null)
+                DeleteProcessIdentity(_processIdentity);
+            _processIdentity = null;
             _process = null;
 
             if (Status == TunnelStatus.Stopped) return;
@@ -151,13 +227,52 @@ public sealed class CloudflareTunnelService : IAsyncDisposable
     private void KillProcess()
     {
         if (_process == null) return;
+        var stopped = false;
         try
         {
             _logger?.LogInformation("Stopping cloudflared tunnel (PID {Pid})", _process.Id);
-            _process.Kill(entireProcessTree: true);
+            if (!_process.HasExited)
+                _process.Kill(entireProcessTree: true);
+            stopped = true;
         }
-        catch { }
+        catch
+        {
+            // The process may already have exited.
+            try
+            {
+                stopped = _process.HasExited;
+            }
+            catch
+            {
+                // Retain the state file so a later startup can retry ownership cleanup.
+            }
+        }
+
+        if (stopped && _processIdentity is not null)
+            DeleteProcessIdentity(_processIdentity);
+        _processIdentity = null;
         _process = null;
+    }
+
+    private void TryKillStartedProcess()
+    {
+        var stopped = false;
+        try
+        {
+            if (_process is not null)
+            {
+                if (!_process.HasExited)
+                    _process.Kill(entireProcessTree: true);
+                stopped = true;
+            }
+        }
+        catch
+        {
+            // Preserve the original start/persistence failure.
+        }
+
+        if (stopped && _processIdentity is not null)
+            DeleteProcessIdentity(_processIdentity);
     }
 
     private void SetStatus(TunnelStatus status, string? error)
@@ -168,7 +283,7 @@ public sealed class CloudflareTunnelService : IAsyncDisposable
     }
 
     [SupportedOSPlatform("windows")]
-    private bool DetectTunnelWithToken(string token)
+    private bool DetectLegacyTunnelWithToken(string token)
     {
         try
         {
@@ -176,14 +291,15 @@ public sealed class CloudflareTunnelService : IAsyncDisposable
                 "SELECT ProcessId, CommandLine FROM Win32_Process WHERE Name = 'cloudflared.exe'");
             foreach (var obj in searcher.Get())
             {
-                var cmd = obj["CommandLine"]?.ToString() ?? "";
-                if (cmd.Contains(token, StringComparison.Ordinal))
+                var commandLine = obj["CommandLine"]?.ToString() ?? "";
+                if (CommandLineContainsLegacyToken(commandLine, token))
                     return true;
             }
         }
         catch (Exception ex)
         {
-            _logger?.LogDebug(ex, "Failed to detect existing tunnel process");
+            _logger?.LogDebug(
+                "Failed to detect existing legacy tunnel process ({ErrorType})", ex.GetType().Name);
         }
         return false;
     }
@@ -191,29 +307,133 @@ public sealed class CloudflareTunnelService : IAsyncDisposable
     [SupportedOSPlatform("windows")]
     private void KillOrphanedProcesses(string token)
     {
+        KillTrackedOrphan();
+
+        // TODO: Remove this command-line migration fallback after one release.
+        KillLegacyOrphans(token);
+    }
+
+    [SupportedOSPlatform("windows")]
+    private void KillTrackedOrphan()
+    {
+        var identity = LoadProcessIdentity();
+        if (identity is null) return;
+
+        try
+        {
+            using var process = Process.GetProcessById(identity.ProcessId);
+            var startTimeUtcTicks = process.StartTime.ToUniversalTime().Ticks;
+            if (!IsOwnedProcess(identity, process.Id, startTimeUtcTicks, process.ProcessName))
+            {
+                DeleteProcessIdentity(identity);
+                return;
+            }
+
+            process.Kill(entireProcessTree: true);
+            DeleteProcessIdentity(identity);
+            _logger?.LogInformation(
+                "Killed tracked orphaned cloudflared process (PID {Pid})", identity.ProcessId);
+        }
+        catch (ArgumentException)
+        {
+            DeleteProcessIdentity(identity);
+        }
+        catch (InvalidOperationException)
+        {
+            DeleteProcessIdentity(identity);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogDebug(
+                "Failed to clean up tracked tunnel process ({ErrorType})", ex.GetType().Name);
+        }
+    }
+
+    [SupportedOSPlatform("windows")]
+    private void KillLegacyOrphans(string token)
+    {
         try
         {
             using var searcher = new ManagementObjectSearcher(
                 "SELECT ProcessId, CommandLine FROM Win32_Process WHERE Name = 'cloudflared.exe'");
             foreach (var obj in searcher.Get())
             {
-                var cmd = obj["CommandLine"]?.ToString() ?? "";
-                if (!cmd.Contains(token, StringComparison.Ordinal)) continue;
+                var commandLine = obj["CommandLine"]?.ToString() ?? "";
+                if (!CommandLineContainsLegacyToken(commandLine, token)) continue;
 
                 var pid = Convert.ToInt32(obj["ProcessId"]);
                 try
                 {
-                    using var proc = Process.GetProcessById(pid);
-                    proc.Kill(entireProcessTree: true);
-                    _logger?.LogInformation("Killed orphaned cloudflared process (PID {Pid})", pid);
+                    using var process = Process.GetProcessById(pid);
+                    if (!string.Equals(process.ProcessName, "cloudflared", StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    process.Kill(entireProcessTree: true);
+                    _logger?.LogInformation(
+                        "Killed legacy orphaned cloudflared process (PID {Pid})", pid);
                 }
-                catch { }
+                catch
+                {
+                    // The process may have exited between enumeration and termination.
+                }
             }
         }
         catch (Exception ex)
         {
-            _logger?.LogDebug(ex, "Failed to clean up orphaned tunnel processes");
+            _logger?.LogDebug(
+                "Failed to clean up legacy tunnel processes ({ErrorType})", ex.GetType().Name);
         }
+    }
+
+    private TunnelProcessIdentity? LoadProcessIdentity()
+    {
+        try
+        {
+            if (!File.Exists(_stateFilePath)) return null;
+            return JsonSerializer.Deserialize<TunnelProcessIdentity>(
+                File.ReadAllText(_stateFilePath));
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogDebug(
+                "Failed to read cloudflared process state ({ErrorType})", ex.GetType().Name);
+            return null;
+        }
+    }
+
+    private void SaveProcessIdentity(TunnelProcessIdentity identity)
+    {
+        var directory = Path.GetDirectoryName(_stateFilePath)
+            ?? throw new InvalidOperationException("Tunnel state path has no directory");
+        Directory.CreateDirectory(directory);
+
+        var temporaryPath = _stateFilePath + ".tmp";
+        File.WriteAllText(temporaryPath, JsonSerializer.Serialize(identity));
+        File.Move(temporaryPath, _stateFilePath, overwrite: true);
+    }
+
+    private void DeleteProcessIdentity(TunnelProcessIdentity expectedIdentity)
+    {
+        try
+        {
+            var storedIdentity = LoadProcessIdentity();
+            if (storedIdentity != expectedIdentity) return;
+            File.Delete(_stateFilePath);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogDebug(
+                "Failed to delete cloudflared process state ({ErrorType})", ex.GetType().Name);
+        }
+    }
+
+    private static string GetDefaultStateFilePath()
+    {
+        var appName = Assembly.GetEntryAssembly()?.GetName().Name;
+        if (string.IsNullOrWhiteSpace(appName)) appName = "RedBamboo";
+        return Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            appName,
+            StateFileName);
     }
 
     private static string? ResolveCloudflaredPath(string? configuredPath)
@@ -232,3 +452,5 @@ public sealed class CloudflareTunnelService : IAsyncDisposable
         return null;
     }
 }
+
+internal sealed record TunnelProcessIdentity(int ProcessId, long StartTimeUtcTicks);
